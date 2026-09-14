@@ -3,7 +3,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUserAndOrg } from "@/app/actions/auth";
 import { getInvoicesAction, duplicateInvoiceAction } from "@/app/actions/invoice";
-import { AppLayout } from "@/components/layout/AppLayout";
 import {
   FileText,
   PlusCircle,
@@ -23,9 +22,8 @@ export default async function InvoicesHistoryPage() {
   const invoices: InvoiceDoc[] = res.success && res.invoices ? res.invoices : [];
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
               Invoice History
@@ -141,6 +139,5 @@ export default async function InvoicesHistoryPage() {
           </div>
         )}
       </div>
-    </AppLayout>
   );
 }

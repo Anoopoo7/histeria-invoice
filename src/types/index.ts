@@ -14,6 +14,13 @@ export interface UserDoc {
   updatedAt: string;
 }
 
+export interface OrganizationMember {
+  userId: string;
+  email: string;
+  role: "OWNER" | "ADMIN" | "MEMBER";
+  addedAt: string;
+}
+
 export interface OrganizationDoc {
   _id: string;
   ownerId: string;
@@ -44,6 +51,7 @@ export interface OrganizationDoc {
   upiId?: string;
   defaultTaxProfileId?: string;
   defaultTemplateId?: string;
+  members: OrganizationMember[];
   createdAt: string;
   updatedAt: string;
 }

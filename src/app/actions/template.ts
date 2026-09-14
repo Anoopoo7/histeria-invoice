@@ -4,23 +4,18 @@ import { connectDB } from "@/lib/db/mongodb";
 import { Organization } from "@/lib/models/Organization";
 import { InvoiceTemplate } from "@/lib/models/InvoiceTemplate";
 import { requireAuth } from "@/lib/auth/session";
+import { getActiveOrgForUser } from "./organization";
 import { templateSchema } from "@/lib/validation";
 import { z } from "zod";
 
 type TemplateInput = z.infer<typeof templateSchema>;
 
-async function getOrgForUser(userId: string) {
-  await connectDB();
-  const org = await Organization.findOne({ ownerId: userId }).lean();
-  if (!org) throw new Error("ORGANIZATION_NOT_FOUND");
-  return org;
-}
-
 export async function getTemplatesAction() {
   try {
     const session = await requireAuth();
-    const org = await getOrgForUser(session.userId);
+    const org = await getActiveOrgForUser(session.userId);
 
+    await connectDB();
     const templates = await InvoiceTemplate.find({ organizationId: org._id })
       .sort({ createdAt: -1 })
       .lean();
@@ -38,8 +33,9 @@ export async function getTemplatesAction() {
 export async function getTemplateByIdAction(id: string) {
   try {
     const session = await requireAuth();
-    const org = await getOrgForUser(session.userId);
+    const org = await getActiveOrgForUser(session.userId);
 
+    await connectDB();
     const template = await InvoiceTemplate.findOne({
       _id: id,
       organizationId: org._id,
@@ -61,8 +57,9 @@ export async function createTemplateAction(data: TemplateInput) {
   try {
     const session = await requireAuth();
     const validated = templateSchema.parse(data);
-    const org = await getOrgForUser(session.userId);
+    const org = await getActiveOrgForUser(session.userId);
 
+    await connectDB();
     if (validated.isDefault) {
       await InvoiceTemplate.updateMany(
         { organizationId: org._id },
@@ -95,8 +92,9 @@ export async function createTemplateAction(data: TemplateInput) {
 export async function updateTemplateAction(id: string, data: Partial<TemplateInput>) {
   try {
     const session = await requireAuth();
-    const org = await getOrgForUser(session.userId);
+    const org = await getActiveOrgForUser(session.userId);
 
+    await connectDB();
     const template = await InvoiceTemplate.findOne({ _id: id, organizationId: org._id });
     if (!template) return { success: false, error: "Template not found" };
 
@@ -127,8 +125,9 @@ export async function updateTemplateAction(id: string, data: Partial<TemplateInp
 export async function deleteTemplateAction(id: string) {
   try {
     const session = await requireAuth();
-    const org = await getOrgForUser(session.userId);
+    const org = await getActiveOrgForUser(session.userId);
 
+    await connectDB();
     const template = await InvoiceTemplate.findOne({ _id: id, organizationId: org._id });
     if (!template) return { success: false, error: "Template not found" };
 
@@ -147,8 +146,9 @@ export async function deleteTemplateAction(id: string) {
 export async function setDefaultTemplateAction(id: string) {
   try {
     const session = await requireAuth();
-    const org = await getOrgForUser(session.userId);
+    const org = await getActiveOrgForUser(session.userId);
 
+    await connectDB();
     await InvoiceTemplate.updateMany(
       { organizationId: org._id },
       { $set: { isDefault: false } }

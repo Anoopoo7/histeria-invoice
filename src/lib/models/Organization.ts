@@ -1,5 +1,12 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 
+export interface IOrganizationMember {
+  userId: mongoose.Types.ObjectId;
+  email: string;
+  role: "OWNER" | "ADMIN" | "MEMBER";
+  addedAt: Date;
+}
+
 export interface IOrganization extends Document {
   ownerId: mongoose.Types.ObjectId;
   name: string;
@@ -29,9 +36,20 @@ export interface IOrganization extends Document {
   upiId?: string;
   defaultTaxProfileId?: mongoose.Types.ObjectId;
   defaultTemplateId?: mongoose.Types.ObjectId;
+  members: IOrganizationMember[];
   createdAt: Date;
   updatedAt: Date;
 }
+
+const MemberSchema = new Schema<IOrganizationMember>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    email: { type: String, required: true, lowercase: true, trim: true },
+    role: { type: String, enum: ["OWNER", "ADMIN", "MEMBER"], default: "MEMBER" },
+    addedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
 
 const OrganizationSchema = new Schema<IOrganization>(
   {
@@ -63,11 +81,14 @@ const OrganizationSchema = new Schema<IOrganization>(
     upiId: { type: String, trim: true },
     defaultTaxProfileId: { type: Schema.Types.ObjectId, ref: "TaxProfile" },
     defaultTemplateId: { type: Schema.Types.ObjectId, ref: "InvoiceTemplate" },
+    members: [MemberSchema],
   },
   { timestamps: true }
 );
 
 OrganizationSchema.index({ ownerId: 1 });
+OrganizationSchema.index({ "members.userId": 1 });
+OrganizationSchema.index({ "members.email": 1 });
 
 export const Organization: Model<IOrganization> =
   mongoose.models.Organization || mongoose.model<IOrganization>("Organization", OrganizationSchema);

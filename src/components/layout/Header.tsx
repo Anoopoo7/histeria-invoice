@@ -5,10 +5,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Building2, Plus, LogOut, FileText, LayoutTemplate, Home } from "lucide-react";
 import { logoutUser } from "@/app/actions/auth";
+import { OrgSwitcher } from "./OrgSwitcher";
+import { OrganizationDoc } from "@/types";
 
 interface HeaderProps {
   user?: { name: string; email: string } | null;
-  organization?: { name: string; logoUrl?: string } | null;
+  organization?: OrganizationDoc | null;
 }
 
 export function Header({ user, organization }: HeaderProps) {
@@ -31,21 +33,21 @@ export function Header({ user, organization }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-slate-200">
       <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link href="/dashboard" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm shadow-sm group-hover:bg-slate-800 transition-colors">
-            H
-          </div>
-          <div>
-            <span className="font-bold text-slate-900 text-base leading-tight block">
-              {organization?.name || "Histeria Invoice"}
-            </span>
-            {organization?.name && (
-              <span className="text-[10px] text-slate-500 font-medium tracking-wide uppercase block -mt-0.5">
-                GST Invoice SaaS
+        {/* Left Branding / Org Switcher */}
+        <div className="flex items-center gap-2">
+          {organization ? (
+            <OrgSwitcher currentOrg={organization} />
+          ) : (
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                H
+              </div>
+              <span className="font-bold text-slate-900 text-base leading-tight">
+                Histeria Invoice
               </span>
-            )}
-          </div>
-        </Link>
+            </Link>
+          )}
+        </div>
 
         {/* Desktop Navigation Links */}
         <nav className="hidden md:flex items-center gap-1 text-sm font-medium text-slate-600">

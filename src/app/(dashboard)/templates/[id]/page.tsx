@@ -2,7 +2,6 @@ import React from "react";
 import { redirect, notFound } from "next/navigation";
 import { getCurrentUserAndOrg } from "@/app/actions/auth";
 import { getTemplateByIdAction } from "@/app/actions/template";
-import { AppLayout } from "@/components/layout/AppLayout";
 import { TemplateEditor } from "@/components/template/TemplateEditor";
 
 export default async function EditTemplatePage(props: {
@@ -22,15 +21,13 @@ export default async function EditTemplatePage(props: {
   const tmpl = res.template;
 
   return (
-    <AppLayout>
-      <TemplateEditor
-        templateId={tmpl._id}
-        initialName={tmpl.name}
-        initialDescription={tmpl.description}
-        initialJson={tmpl.templateJson}
-        isDefault={tmpl.isDefault}
-        isNew={false}
-      />
-    </AppLayout>
+    <TemplateEditor
+      templateId={tmpl._id}
+      initialName={tmpl.name}
+      initialDescription={tmpl.description}
+      initialJson={tmpl.templateJson}
+      isDefault={tmpl.isDefault}
+      isNew={false}
+    />
   );
 }

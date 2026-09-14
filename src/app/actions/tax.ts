@@ -1,26 +1,20 @@
 "use server";
 
 import { connectDB } from "@/lib/db/mongodb";
-import { Organization } from "@/lib/models/Organization";
 import { TaxProfile } from "@/lib/models/TaxProfile";
 import { requireAuth } from "@/lib/auth/session";
+import { getActiveOrgForUser } from "./organization";
 import { taxProfileSchema } from "@/lib/validation";
 import { z } from "zod";
 
 type TaxInput = z.infer<typeof taxProfileSchema>;
 
-async function getOrgForUser(userId: string) {
-  await connectDB();
-  const org = await Organization.findOne({ ownerId: userId }).lean();
-  if (!org) throw new Error("ORGANIZATION_NOT_FOUND");
-  return org;
-}
-
 export async function getTaxProfilesAction() {
   try {
     const session = await requireAuth();
-    const org = await getOrgForUser(session.userId);
+    const org = await getActiveOrgForUser(session.userId);
 
+    await connectDB();
     const profiles = await TaxProfile.find({ organizationId: org._id }).sort({ rate: 1 }).lean();
     return {
       success: true,
@@ -36,8 +30,9 @@ export async function createTaxProfileAction(data: TaxInput) {
   try {
     const session = await requireAuth();
     const validated = taxProfileSchema.parse(data);
-    const org = await getOrgForUser(session.userId);
+    const org = await getActiveOrgForUser(session.userId);
 
+    await connectDB();
     const created = await TaxProfile.create({
       organizationId: org._id,
       ...validated,
@@ -56,8 +51,9 @@ export async function createTaxProfileAction(data: TaxInput) {
 export async function updateTaxProfileAction(id: string, data: Partial<TaxInput>) {
   try {
     const session = await requireAuth();
-    const org = await getOrgForUser(session.userId);
+    const org = await getActiveOrgForUser(session.userId);
 
+    await connectDB();
     const profile = await TaxProfile.findOne({ _id: id, organizationId: org._id });
     if (!profile) return { success: false, error: "Tax profile not found" };
 
@@ -77,8 +73,9 @@ export async function updateTaxProfileAction(id: string, data: Partial<TaxInput>
 export async function deleteTaxProfileAction(id: string) {
   try {
     const session = await requireAuth();
-    const org = await getOrgForUser(session.userId);
+    const org = await getActiveOrgForUser(session.userId);
 
+    await connectDB();
     await TaxProfile.deleteOne({ _id: id, organizationId: org._id });
     return { success: true };
   } catch (err: unknown) {

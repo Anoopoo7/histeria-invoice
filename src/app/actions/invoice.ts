@@ -5,6 +5,7 @@ import { Organization } from "@/lib/models/Organization";
 import { Invoice } from "@/lib/models/Invoice";
 import { InvoiceTemplate } from "@/lib/models/InvoiceTemplate";
 import { requireAuth } from "@/lib/auth/session";
+import { getActiveOrgForUser } from "./organization";
 import { invoiceCreateSchema } from "@/lib/validation";
 import { calculateInvoiceTotals } from "@/lib/calculations/invoice";
 import { generatePublicId } from "@/lib/utils/cn";
@@ -13,24 +14,18 @@ import { z } from "zod";
 
 type InvoiceCreateInput = z.infer<typeof invoiceCreateSchema>;
 
-async function getOrgForUser(userId: string) {
-  await connectDB();
-  const org = await Organization.findOne({ ownerId: userId });
-  if (!org) throw new Error("ORGANIZATION_NOT_FOUND");
-  return org;
-}
-
 export async function createInvoiceAction(data: InvoiceCreateInput) {
   try {
     const session = await requireAuth();
     const validated = invoiceCreateSchema.parse(data);
-    const org = await getOrgForUser(session.userId);
+    const org = await getActiveOrgForUser(session.userId);
 
     // Atomic invoice number generation
     const prefix = org.invoicePrefix || "INV";
     const currentNum = org.nextInvoiceNumber || 1001;
     const generatedInvoiceNumber = validated.invoiceNumber || `${prefix}-${currentNum}`;
 
+    await connectDB();
     // Update next invoice number atomically
     await Organization.updateOne(
       { _id: org._id },
@@ -126,8 +121,9 @@ export async function createInvoiceAction(data: InvoiceCreateInput) {
 export async function getInvoicesAction() {
   try {
     const session = await requireAuth();
-    const org = await getOrgForUser(session.userId);
+    const org = await getActiveOrgForUser(session.userId);
 
+    await connectDB();
     const invoices = await Invoice.find({ organizationId: org._id })
       .sort({ createdAt: -1 })
       .lean();
@@ -145,8 +141,9 @@ export async function getInvoicesAction() {
 export async function getInvoiceByIdAction(id: string) {
   try {
     const session = await requireAuth();
-    const org = await getOrgForUser(session.userId);
+    const org = await getActiveOrgForUser(session.userId);
 
+    await connectDB();
     const invoice = await Invoice.findOne({ _id: id, organizationId: org._id }).lean();
     if (!invoice) return { success: false, error: "Invoice not found" };
 
@@ -179,8 +176,9 @@ export async function getInvoiceByPublicIdAction(publicId: string) {
 export async function duplicateInvoiceAction(id: string) {
   try {
     const session = await requireAuth();
-    const org = await getOrgForUser(session.userId);
+    const org = await getActiveOrgForUser(session.userId);
 
+    await connectDB();
     const source = await Invoice.findOne({ _id: id, organizationId: org._id }).lean();
     if (!source) return { success: false, error: "Original invoice not found" };
 
@@ -229,8 +227,9 @@ export async function duplicateInvoiceAction(id: string) {
 export async function deleteInvoiceAction(id: string) {
   try {
     const session = await requireAuth();
-    const org = await getOrgForUser(session.userId);
+    const org = await getActiveOrgForUser(session.userId);
 
+    await connectDB();
     await Invoice.deleteOne({ _id: id, organizationId: org._id });
     return { success: true };
   } catch (err: unknown) {

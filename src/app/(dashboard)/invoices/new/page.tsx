@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { getCurrentUserAndOrg } from "@/app/actions/auth";
 import { getTaxProfilesAction } from "@/app/actions/tax";
 import { getTemplatesAction } from "@/app/actions/template";
-import { AppLayout } from "@/components/layout/AppLayout";
 import { InvoiceForm } from "@/components/invoice/InvoiceForm";
 
 export default async function NewInvoicePage() {
@@ -21,23 +20,21 @@ export default async function NewInvoicePage() {
   const templates = tmplRes.success && tmplRes.templates ? tmplRes.templates : [];
 
   return (
-    <AppLayout>
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
-            Create Invoice
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Fill in customer & item details for instant GST calculation
-          </p>
-        </div>
-
-        <InvoiceForm
-          organization={organization}
-          taxProfiles={taxProfiles}
-          templates={templates}
-        />
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
+          Create Invoice
+        </h1>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Fill in customer & item details for instant GST calculation
+        </p>
       </div>
-    </AppLayout>
+
+      <InvoiceForm
+        organization={organization}
+        taxProfiles={taxProfiles}
+        templates={templates}
+      />
+    </div>
   );
 }
