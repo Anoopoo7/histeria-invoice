@@ -19,11 +19,50 @@ import { revalidatePath } from "next/cache";
 type OrganizationInput = z.infer<typeof organizationSchema>;
 
 /**
+ * Ensures legacy organization documents have members array initialized with OWNER
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function ensureOrgMembersInitialized(orgDoc: any) {
+  if (!orgDoc) return;
+  await connectDB();
+  const ownerUser = await User.findById(orgDoc.ownerId).lean();
+  const ownerEmail = ownerUser?.email?.toLowerCase();
+
+  const membersArr = orgDoc.members || [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hasOwner = membersArr.some((m: any) =>
+    m && (m.role === "OWNER" || (ownerEmail && m.email?.toLowerCase() === ownerEmail))
+  );
+
+  if (!hasOwner && ownerEmail) {
+    await Organization.updateOne(
+      { _id: orgDoc._id },
+      {
+        $push: {
+          members: {
+            $each: [
+              {
+                userId: orgDoc.ownerId,
+                email: ownerEmail,
+                role: "OWNER",
+                addedAt: orgDoc.createdAt || new Date(),
+              },
+            ],
+            $position: 0,
+          },
+        },
+      }
+    );
+  }
+}
+
+/**
  * Helper to fetch the currently active organization for the authenticated user
  */
 export async function getActiveOrgForUser(userId: string): Promise<IOrganization> {
   await connectDB();
   const user = await User.findById(userId).lean();
+  const userEmail = user?.email?.toLowerCase();
   const activeOrgId = await getActiveOrgCookie();
 
   if (activeOrgId) {
@@ -32,10 +71,14 @@ export async function getActiveOrgForUser(userId: string): Promise<IOrganization
       $or: [
         { ownerId: userId },
         { "members.userId": userId },
-        { "members.email": user?.email?.toLowerCase() },
+        { "members.email": userEmail },
       ],
     });
-    if (org) return org;
+    if (org) {
+      await ensureOrgMembersInitialized(org);
+      const reloaded = await Organization.findById(org._id);
+      return reloaded || org;
+    }
   }
 
   // Fallback to first org where user is owner or member
@@ -43,7 +86,7 @@ export async function getActiveOrgForUser(userId: string): Promise<IOrganization
     $or: [
       { ownerId: userId },
       { "members.userId": userId },
-      { "members.email": user?.email?.toLowerCase() },
+      { "members.email": userEmail },
     ],
   });
 
@@ -51,8 +94,12 @@ export async function getActiveOrgForUser(userId: string): Promise<IOrganization
     throw new Error("ORGANIZATION_NOT_FOUND");
   }
 
-  await setActiveOrgCookie(fallbackOrg._id.toString());
-  return fallbackOrg;
+  await ensureOrgMembersInitialized(fallbackOrg);
+  const reloadedFallback = await Organization.findById(fallbackOrg._id);
+  const finalOrg = reloadedFallback || fallbackOrg;
+
+  await setActiveOrgCookie(finalOrg._id.toString());
+  return finalOrg;
 }
 
 export async function getUserOrganizationsAction() {
@@ -60,12 +107,27 @@ export async function getUserOrganizationsAction() {
     const session = await requireAuth();
     await connectDB();
     const user = await User.findById(session.userId).lean();
+    const userEmail = user?.email?.toLowerCase();
 
     const orgs = await Organization.find({
       $or: [
         { ownerId: session.userId },
         { "members.userId": session.userId },
-        { "members.email": user?.email?.toLowerCase() },
+        { "members.email": userEmail },
+      ],
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    for (const o of orgs) {
+      await ensureOrgMembersInitialized(o);
+    }
+
+    const reloadedOrgs = await Organization.find({
+      $or: [
+        { ownerId: session.userId },
+        { "members.userId": session.userId },
+        { "members.email": userEmail },
       ],
     })
       .sort({ createdAt: -1 })
@@ -75,8 +137,8 @@ export async function getUserOrganizationsAction() {
 
     return {
       success: true,
-      organizations: JSON.parse(JSON.stringify(orgs)),
-      activeOrgId: activeOrgId || (orgs[0] ? orgs[0]._id.toString() : null),
+      organizations: JSON.parse(JSON.stringify(reloadedOrgs)),
+      activeOrgId: activeOrgId || (reloadedOrgs[0] ? reloadedOrgs[0]._id.toString() : null),
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to fetch organizations";
@@ -89,13 +151,14 @@ export async function switchOrganizationAction(orgId: string) {
     const session = await requireAuth();
     await connectDB();
     const user = await User.findById(session.userId).lean();
+    const userEmail = user?.email?.toLowerCase();
 
     const org = await Organization.findOne({
       _id: orgId,
       $or: [
         { ownerId: session.userId },
         { "members.userId": session.userId },
-        { "members.email": user?.email?.toLowerCase() },
+        { "members.email": userEmail },
       ],
     });
 
@@ -217,25 +280,43 @@ export async function addStaffMemberAction(email: string, role: "ADMIN" | "MEMBE
     const org = await getActiveOrgForUser(session.userId);
     const targetEmail = email.trim().toLowerCase();
 
-    // Check if already a member
-    const exists = org.members.some((m) => m.email.toLowerCase() === targetEmail);
+    await connectDB();
+    await ensureOrgMembersInitialized(org);
+
+    const currentOrgDoc = await Organization.findById(org._id).lean();
+    if (!currentOrgDoc) return { success: false, error: "Organization not found" };
+
+    const membersArr = currentOrgDoc.members || [];
+    const exists = membersArr.some(
+      (m: { email?: string; role?: string }) => m && m.email && m.email.toLowerCase() === targetEmail
+    );
+
     if (exists) {
-      return { success: false, error: "This email is already a staff member in this business." };
+      return { success: false, error: "This email is already added as a staff member in this business." };
     }
 
-    await connectDB();
     const existingUser = await User.findOne({ email: targetEmail }).lean();
 
-    org.members.push({
-      userId: existingUser ? existingUser._id : org.ownerId, // placeholder or registered userId
-      email: targetEmail,
-      role,
-      addedAt: new Date(),
-    });
+    // Atomic $push into Organization members array
+    await Organization.updateOne(
+      { _id: currentOrgDoc._id },
+      {
+        $push: {
+          members: {
+            userId: existingUser ? existingUser._id : undefined,
+            email: targetEmail,
+            role,
+            addedAt: new Date(),
+          },
+        },
+      }
+    );
 
-    await org.save();
+    const updatedOrg = await Organization.findById(currentOrgDoc._id).lean();
     revalidatePath("/organization");
-    return { success: true, organization: JSON.parse(JSON.stringify(org)) };
+    revalidatePath("/organization/members");
+
+    return { success: true, organization: JSON.parse(JSON.stringify(updatedOrg)) };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to add staff member";
     return { success: false, error: message };
@@ -246,12 +327,23 @@ export async function removeStaffMemberAction(memberEmail: string) {
   try {
     const session = await requireAuth();
     const org = await getActiveOrgForUser(session.userId);
+    const targetEmail = memberEmail.trim().toLowerCase();
+
+    await connectDB();
 
     if (org.ownerId.toString() === session.userId) {
-      // Owner removing member
-      org.members = org.members.filter((m) => m.email.toLowerCase() !== memberEmail.toLowerCase());
-      await org.save();
+      // Owner removing member using atomic $pull
+      await Organization.updateOne(
+        { _id: org._id },
+        {
+          $pull: {
+            members: { email: targetEmail },
+          },
+        }
+      );
+
       revalidatePath("/organization");
+      revalidatePath("/organization/members");
       return { success: true };
     } else {
       return { success: false, error: "Only the business owner can remove staff members." };

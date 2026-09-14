@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IOrganizationMember {
-  userId: mongoose.Types.ObjectId;
+  userId?: mongoose.Types.ObjectId;
   email: string;
   role: "OWNER" | "ADMIN" | "MEMBER";
   addedAt: Date;
@@ -43,7 +43,7 @@ export interface IOrganization extends Document {
 
 const MemberSchema = new Schema<IOrganizationMember>(
   {
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: false },
     email: { type: String, required: true, lowercase: true, trim: true },
     role: { type: String, enum: ["OWNER", "ADMIN", "MEMBER"], default: "MEMBER" },
     addedAt: { type: Date, default: Date.now },
@@ -81,7 +81,7 @@ const OrganizationSchema = new Schema<IOrganization>(
     upiId: { type: String, trim: true },
     defaultTaxProfileId: { type: Schema.Types.ObjectId, ref: "TaxProfile" },
     defaultTemplateId: { type: Schema.Types.ObjectId, ref: "InvoiceTemplate" },
-    members: [MemberSchema],
+    members: { type: [MemberSchema], default: [] },
   },
   { timestamps: true }
 );

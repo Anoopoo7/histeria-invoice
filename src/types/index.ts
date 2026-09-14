@@ -15,7 +15,7 @@ export interface UserDoc {
 }
 
 export interface OrganizationMember {
-  userId: string;
+  userId?: string;
   email: string;
   role: "OWNER" | "ADMIN" | "MEMBER";
   addedAt: string;
