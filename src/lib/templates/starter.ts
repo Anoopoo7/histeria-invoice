@@ -147,6 +147,25 @@ export const STARTER_TEMPLATES: {
       components: defaultComponents,
     },
   },
+  {
+    name: "Kerala Connect ISP Telecom",
+    description: "Specialized for 15-day ISP broadband subscriptions with SAC 998422, dynamic QR codes, and Kerala GST compliance.",
+    isDefault: false,
+    templateJson: {
+      version: "1.0",
+      page: { size: "A4", orientation: "portrait", padding: 28 },
+      styles: {
+        fontFamily: "Inter",
+        primaryColor: "#0f172a",
+        secondaryColor: "#0284c7",
+        textColor: "#1e293b",
+        backgroundColor: "#ffffff",
+        accentColor: "#0284c7",
+        borderRadius: 4,
+      },
+      components: defaultComponents,
+    },
+  },
 ];
 
 export const STARTER_TAX_PROFILES = [
