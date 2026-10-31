@@ -237,6 +237,8 @@ export async function generateIspQrCodeDataUri(url: string): Promise<string> {
   }
 }
 
+export const ISP_QR_DOMAIN = "https://histeriainvoice.vercel.app";
+
 /**
  * Builds a clean PDF preview URL pointing to /api/isp/invoice?inv=<invoiceNumber>
  * so scanning the QR code fetches the saved invoice record directly from MongoDB.
@@ -245,7 +247,7 @@ export function buildIspInvoicePreviewUrl(
   input: {
     invoice?: Partial<IspInvoiceInfo>;
   },
-  baseOrigin: string = "http://localhost:3000"
+  baseOrigin: string = ISP_QR_DOMAIN
 ): string {
   const origin = baseOrigin.replace(/\/$/, "");
   const inv = input.invoice?.invoiceNumber || "ISP/2026-27/000001";
@@ -257,7 +259,7 @@ export function buildIspInvoicePreviewUrl(
  */
 export async function prepareIspInvoiceData(
   input: Partial<IspInvoiceData>,
-  baseOrigin: string = "http://localhost:3000"
+  baseOrigin: string = ISP_QR_DOMAIN
 ): Promise<IspInvoiceData> {
   const company: IspCompany = {
     brandName: input.company?.brandName || "Kerala Connect",

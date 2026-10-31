@@ -6,7 +6,7 @@ import { connectDB } from "@/lib/db/mongodb";
 import { IspInvoice } from "@/lib/models/IspInvoice";
 import { Invoice, IInvoice } from "@/lib/models/Invoice";
 import { IspBroadbandPdfDocument } from "@/lib/pdf/IspBroadbandPdfDocument";
-import { prepareIspInvoiceData } from "@/lib/calculations/isp";
+import { prepareIspInvoiceData, ISP_QR_DOMAIN } from "@/lib/calculations/isp";
 import { SAMPLE_ISP_INVOICE_DATA } from "@/lib/templates/ispSampleData";
 import { generatePublicId } from "@/lib/utils/cn";
 import { IspInvoiceData } from "@/types/isp";
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
       body = {};
     }
 
-    const origin = request.nextUrl.origin || "http://localhost:3000";
+    const origin = ISP_QR_DOMAIN;
     const searchParams = request.nextUrl.searchParams;
     const format = searchParams.get("format");
     const saveOnly = searchParams.get("saveOnly") === "true";
@@ -182,7 +182,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const format = searchParams.get("format");
     const download = searchParams.get("download") === "true";
-    const origin = request.nextUrl.origin || "http://localhost:3000";
+    const origin = ISP_QR_DOMAIN;
 
     // Identify which invoice to load from MongoDB (by id, inv/invoiceNumber, or latest saved invoice)
     const idParam = searchParams.get("id");
