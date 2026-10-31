@@ -238,60 +238,18 @@ export async function generateIspQrCodeDataUri(url: string): Promise<string> {
 }
 
 /**
- * Builds a dynamic PDF preview URL pointing to /api/isp/invoice with the invoice's details
- * so scanning the QR code opens the exact PDF invoice preview for verification.
+ * Builds a clean PDF preview URL pointing to /api/isp/invoice?inv=<invoiceNumber>
+ * so scanning the QR code fetches the saved invoice record directly from MongoDB.
  */
 export function buildIspInvoicePreviewUrl(
   input: {
     invoice?: Partial<IspInvoiceInfo>;
-    customer?: Partial<IspCustomer>;
-    items?: IspServiceItem[];
-    payment?: Partial<IspPaymentSummary>;
   },
   baseOrigin: string = "http://localhost:3000"
 ): string {
   const origin = baseOrigin.replace(/\/$/, "");
-  const params = new URLSearchParams();
-
   const inv = input.invoice?.invoiceNumber || "ISP/2026-27/000001";
-  const name = input.customer?.name || "Rahul Kumar";
-  const cid = input.customer?.customerId || "ISP1001";
-  const conn = input.customer?.connectionId || "CON1001";
-  const firstItem = input.items?.[0];
-  const amt = firstItem ? (firstItem.taxableAmount ?? firstItem.unitPrice ?? 299) : 299;
-
-  params.set("inv", inv);
-  params.set("name", name);
-  params.set("cid", cid);
-  params.set("conn", conn);
-  params.set("amt", String(amt));
-
-  if (input.invoice?.billingPeriodStart && input.invoice.billingPeriodStart !== "01 October 2026") {
-    params.set("start", input.invoice.billingPeriodStart);
-  }
-  if (input.invoice?.billingPeriodEnd && input.invoice.billingPeriodEnd !== "15 October 2026") {
-    params.set("end", input.invoice.billingPeriodEnd);
-  }
-  if (input.invoice?.invoiceDate && input.invoice.invoiceDate !== "31 October 2026") {
-    params.set("date", input.invoice.invoiceDate);
-  }
-  if (input.invoice?.dueDate && input.invoice.dueDate !== "05 November 2026") {
-    params.set("due", input.invoice.dueDate);
-  }
-  if (input.customer?.phone && input.customer.phone !== "9876543210") {
-    params.set("phone", input.customer.phone);
-  }
-  if (input.customer?.billingAddress && input.customer.billingAddress !== "Kollam, Kerala") {
-    params.set("addr", input.customer.billingAddress);
-  }
-  if (firstItem?.description && firstItem.description !== "Broadband Internet Subscription – 50 Mbps") {
-    params.set("plan", firstItem.description);
-  }
-  if (input.payment?.status && input.payment.status !== "UNPAID") {
-    params.set("status", input.payment.status);
-  }
-
-  return `${origin}/api/isp/invoice?${params.toString()}`;
+  return `${origin}/api/isp/invoice?inv=${encodeURIComponent(inv)}`;
 }
 
 /**
@@ -391,21 +349,9 @@ export async function prepareIspInvoiceData(
     paymentReference: input.payment?.paymentReference,
   };
 
-  // QR Code configuration
+  // QR Code configuration: Always encode /api/isp/invoice?inv=<invoiceNumber>
   const qrEnabled = input.qrCode?.enabled !== false;
-  const dynamicPreviewUrl = buildIspInvoicePreviewUrl(
-    { invoice, customer, items, payment },
-    baseOrigin
-  );
-  const rawQrUrl = input.qrCode?.url?.trim();
-  // If no custom URL is provided, or if the bare /api/isp/invoice endpoint is provided, attach the invoice's query parameters
-  const qrUrl =
-    !rawQrUrl ||
-    rawQrUrl === "http://localhost:3000/api/isp/invoice" ||
-    rawQrUrl === `${baseOrigin.replace(/\/$/, "")}/api/isp/invoice` ||
-    rawQrUrl === "/api/isp/invoice"
-      ? dynamicPreviewUrl
-      : rawQrUrl;
+  const qrUrl = buildIspInvoicePreviewUrl({ invoice }, baseOrigin);
   const qrLabel =
     input.qrCode?.label || "Scan to View Invoice / Pay Online";
 

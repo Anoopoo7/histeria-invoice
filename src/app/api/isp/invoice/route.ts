@@ -1,18 +1,84 @@
 import { NextRequest, NextResponse } from "next/server";
 import React from "react";
+import mongoose from "mongoose";
 import { renderToBuffer } from "@react-pdf/renderer";
+import { connectDB } from "@/lib/db/mongodb";
+import { IspInvoice } from "@/lib/models/IspInvoice";
+import { Invoice, IInvoice } from "@/lib/models/Invoice";
 import { IspBroadbandPdfDocument } from "@/lib/pdf/IspBroadbandPdfDocument";
 import { prepareIspInvoiceData } from "@/lib/calculations/isp";
 import { SAMPLE_ISP_INVOICE_DATA } from "@/lib/templates/ispSampleData";
+import { generatePublicId } from "@/lib/utils/cn";
 import { IspInvoiceData } from "@/types/isp";
 
-// In-memory store for recently generated invoices so QR scans retrieve exact custom fields
-const globalForIsp = globalThis as unknown as {
-  ispInvoiceCache?: Map<string, Partial<IspInvoiceData>>;
-};
-const ispInvoiceCache =
-  globalForIsp.ispInvoiceCache ?? new Map<string, Partial<IspInvoiceData>>();
-globalForIsp.ispInvoiceCache = ispInvoiceCache;
+/**
+ * Maps a standard Invoice document (from the main Invoice collection) into IspInvoiceData
+ * in case the invoice was created via the standard invoice flow.
+ */
+function mapStandardInvoiceToIspInput(doc: IInvoice): Partial<IspInvoiceData> {
+  return {
+    company: {
+      brandName: doc.sellerSnapshot?.name || "Kerala Connect",
+      legalName: doc.sellerSnapshot?.legalName || doc.sellerSnapshot?.name || "Kerala Broadband Services",
+      logoUrl: doc.sellerSnapshot?.logoUrl,
+      address: doc.sellerSnapshot?.address || "Kerala, India",
+      city: doc.sellerSnapshot?.city || "Kollam",
+      state: doc.sellerSnapshot?.state || "Kerala",
+      stateCode: doc.sellerSnapshot?.stateCode || "32",
+      gstin: doc.sellerSnapshot?.gstin || "",
+      pan: "",
+      phone: doc.sellerSnapshot?.phone || "+91 98765 43210",
+      email: doc.sellerSnapshot?.email || "support@keralaconnect.net",
+      website: doc.sellerSnapshot?.website || "www.keralaconnect.net",
+    },
+    invoice: {
+      invoiceNumber: doc.invoiceNumber,
+      invoiceDate: doc.invoiceDate,
+      billingPeriodStart: doc.invoiceDate,
+      billingPeriodEnd: doc.dueDate,
+      billingCycle: "15 Days",
+      dueDate: doc.dueDate,
+      placeOfSupply: doc.customerSnapshot?.state
+        ? `${doc.customerSnapshot.stateCode || "32"} - ${doc.customerSnapshot.state}`
+        : "32 - Kerala",
+      placeOfSupplyCode: doc.customerSnapshot?.stateCode || "32",
+      reverseCharge: "No",
+    },
+    customer: {
+      name: doc.customerSnapshot?.name || "Subscriber",
+      customerId: doc.publicId || "ISP1001",
+      connectionId: doc.invoiceNumber,
+      phone: doc.customerSnapshot?.phone || "",
+      email: doc.customerSnapshot?.email,
+      billingAddress: doc.customerSnapshot?.address || "Kerala",
+      installationAddress: doc.customerSnapshot?.address || "Kerala",
+      state: doc.customerSnapshot?.state || "Kerala",
+      stateCode: doc.customerSnapshot?.stateCode || "32",
+      gstin: doc.customerSnapshot?.gstin,
+    },
+    items: (doc.itemsSnapshot || []).map((item) => ({
+      description: item.description || "Broadband Subscription",
+      sac: "998422",
+      billingPeriod: "15 Days",
+      quantity: item.quantity || 1,
+      unitPrice: item.unitPrice || 0,
+      taxableAmount: item.taxableAmount || item.quantity * item.unitPrice || 0,
+      gstRate: item.taxRate ?? 18,
+    })),
+    payment: {
+      previousBalance: 0,
+      currentInvoiceAmount: doc.totals?.grandTotal || 0,
+      previousPayments: 0,
+      outstandingBalance: doc.totals?.grandTotal || 0,
+      totalAmountPayable: doc.totals?.grandTotal || 0,
+      status: doc.status === "PAID" ? "PAID" : "UNPAID",
+      upiId: doc.paymentSnapshot?.upiId,
+      bankName: doc.paymentSnapshot?.bankName,
+      accountNumber: doc.paymentSnapshot?.accountNumber,
+      ifsc: doc.paymentSnapshot?.ifsc,
+    },
+  };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,24 +86,55 @@ export async function POST(request: NextRequest) {
     try {
       body = await request.json();
     } catch {
-      // Empty body or non-JSON falls back to sample defaults
       body = {};
     }
 
     const origin = request.nextUrl.origin || "http://localhost:3000";
-
-    // Prepare, calculate GST, and dynamically encode QR code pointing to /api/isp/invoice?...
-    const invoiceData = await prepareIspInvoiceData(body, origin);
-
-    // Cache invoice by invoiceNumber so scanning QR code can also recover full custom payload
-    if (invoiceData.invoice?.invoiceNumber) {
-      ispInvoiceCache.set(invoiceData.invoice.invoiceNumber, invoiceData);
-    }
-
     const searchParams = request.nextUrl.searchParams;
     const format = searchParams.get("format");
+    const saveOnly = searchParams.get("saveOnly") === "true";
     const download = searchParams.get("download") === "true";
     const acceptHeader = request.headers.get("accept") || "";
+
+    // Prepare, calculate GST, and encode QR code pointing to /api/isp/invoice?inv=<invoiceNumber>
+    const invoiceData = await prepareIspInvoiceData(body, origin);
+
+    // Save/upsert the generated invoice input and computed data in MongoDB
+    let savedDocId: string | undefined;
+    try {
+      await connectDB();
+      const saved = await IspInvoice.findOneAndUpdate(
+        { invoiceNumber: invoiceData.invoice.invoiceNumber },
+        {
+          $set: {
+            invoiceNumber: invoiceData.invoice.invoiceNumber,
+            customerId: invoiceData.customer.customerId,
+            connectionId: invoiceData.customer.connectionId,
+            customerName: invoiceData.customer.name,
+            rawInput: body,
+            invoiceData,
+          },
+          $setOnInsert: {
+            publicId: generatePublicId(),
+          },
+        },
+        { upsert: true, new: true }
+      ).lean();
+      savedDocId = saved?.publicId;
+    } catch (dbErr) {
+      console.error("Failed to save ISP invoice to MongoDB:", dbErr);
+    }
+
+    // If caller only wanted to persist state to DB and get calculated JSON (e.g. live preview editor)
+    if (saveOnly) {
+      return NextResponse.json({
+        success: true,
+        publicId: savedDocId,
+        invoiceNumber: invoiceData.invoice.invoiceNumber,
+        qrCodeUrl: invoiceData.qrCode.url,
+        invoiceData,
+      });
+    }
 
     // Generate PDF Buffer
     const element = React.createElement(IspBroadbandPdfDocument, {
@@ -47,11 +144,11 @@ export async function POST(request: NextRequest) {
     const pdfBuffer = await renderToBuffer(element as any);
     const pdfUint8Array = new Uint8Array(pdfBuffer);
 
-    // If client requested JSON representation (e.g. for API integrations storing base64)
     if (format === "json" || acceptHeader.includes("application/json")) {
       const base64Pdf = Buffer.from(pdfBuffer).toString("base64");
       return NextResponse.json({
         success: true,
+        publicId: savedDocId,
         invoiceNumber: invoiceData.invoice.invoiceNumber,
         grandTotal: invoiceData.gst.finalInvoiceAmount,
         totalGst: invoiceData.gst.totalGst,
@@ -62,7 +159,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Default: Stream the PDF binary
     const dispositionType = download ? "attachment" : "inline";
     const filename = `${invoiceData.invoice.invoiceNumber.replace(/[/\\?%*:|"<>]/g, "-")}.pdf`;
 
@@ -88,103 +184,74 @@ export async function GET(request: NextRequest) {
     const download = searchParams.get("download") === "true";
     const origin = request.nextUrl.origin || "http://localhost:3000";
 
-    // Reconstruct the specific invoice from query parameters or cache when QR code is scanned
-    const invParam = searchParams.get("inv");
-    const nameParam = searchParams.get("name");
-    const cidParam = searchParams.get("cid");
-    const connParam = searchParams.get("conn");
-    const amtParam = searchParams.get("amt");
-    const startParam = searchParams.get("start");
-    const endParam = searchParams.get("end");
-    const dateParam = searchParams.get("date");
-    const dueParam = searchParams.get("due");
-    const phoneParam = searchParams.get("phone");
-    const addrParam = searchParams.get("addr");
-    const planParam = searchParams.get("plan");
-    const statusParam = searchParams.get("status") as
-      | "PAID"
-      | "UNPAID"
-      | "PARTIALLY PAID"
-      | null;
-    const dataParam = searchParams.get("data");
+    // Identify which invoice to load from MongoDB (by id, inv/invoiceNumber, or latest saved invoice)
+    const idParam = searchParams.get("id");
+    const invParam =
+      searchParams.get("inv") || searchParams.get("invoiceNumber");
 
-    let baseInput: Partial<IspInvoiceData> = { ...SAMPLE_ISP_INVOICE_DATA };
+    let dbInput: Partial<IspInvoiceData> | null = null;
 
-    // 1. Check if full invoice was cached during POST /api/isp/invoice
-    if (invParam && ispInvoiceCache.has(invParam)) {
-      baseInput = { ...baseInput, ...ispInvoiceCache.get(invParam) };
-    }
+    try {
+      await connectDB();
 
-    // 2. Check if base64 JSON payload was passed via ?data=
-    if (dataParam) {
-      try {
-        const decoded = JSON.parse(Buffer.from(dataParam, "base64").toString("utf-8"));
-        baseInput = { ...baseInput, ...decoded };
-      } catch {
-        // Ignore malformed data param and rely on individual query params
+      if (idParam || invParam) {
+        const lookupKey = (idParam || invParam) as string;
+        const orConditions: Record<string, unknown>[] = [
+          { publicId: lookupKey },
+          { invoiceNumber: lookupKey },
+        ];
+        if (mongoose.Types.ObjectId.isValid(lookupKey)) {
+          orConditions.push({ _id: lookupKey });
+        }
+
+        // 1. Check IspInvoice collection first
+        const ispDoc = await IspInvoice.findOne({ $or: orConditions })
+          .sort({ updatedAt: -1 })
+          .lean();
+
+        if (ispDoc) {
+          const hasRawInput =
+            ispDoc.rawInput && Object.keys(ispDoc.rawInput).length > 0;
+          dbInput = hasRawInput ? ispDoc.rawInput : ispDoc.invoiceData;
+        } else {
+          // 2. Fallback: Check standard Invoice collection
+          const stdDoc = await Invoice.findOne({ $or: orConditions })
+            .sort({ updatedAt: -1 })
+            .lean();
+          if (stdDoc) {
+            dbInput = mapStandardInvoiceToIspInput(stdDoc as unknown as IInvoice);
+          } else if (lookupKey !== SAMPLE_ISP_INVOICE_DATA.invoice.invoiceNumber) {
+            return NextResponse.json(
+              { error: `Invoice "${lookupKey}" not found in database` },
+              { status: 404 }
+            );
+          }
+        }
+      } else {
+        // No query param provided (e.g. bare http://localhost:3000/api/isp/invoice):
+        // Load the most recently generated/updated ISP invoice from MongoDB
+        const latestIspDoc = await IspInvoice.findOne()
+          .sort({ updatedAt: -1 })
+          .lean();
+        if (latestIspDoc) {
+          const hasRawInput =
+            latestIspDoc.rawInput && Object.keys(latestIspDoc.rawInput).length > 0;
+          dbInput = hasRawInput ? latestIspDoc.rawInput : latestIspDoc.invoiceData;
+        }
       }
+    } catch (dbErr) {
+      console.error("Failed to fetch ISP invoice from MongoDB:", dbErr);
     }
 
-    // 3. Apply query parameters from QR code URL so the preview matches the exact invoice
-    const parsedAmount =
-      amtParam !== null && !Number.isNaN(Number(amtParam))
-        ? Number(amtParam)
-        : baseInput.items?.[0]?.taxableAmount ?? 299;
-
-    const mergedInput: Partial<IspInvoiceData> = {
-      ...baseInput,
-      invoice: {
-        ...(baseInput.invoice || SAMPLE_ISP_INVOICE_DATA.invoice),
-        ...(invParam ? { invoiceNumber: invParam } : {}),
-        ...(dateParam ? { invoiceDate: dateParam } : {}),
-        ...(startParam ? { billingPeriodStart: startParam } : {}),
-        ...(endParam ? { billingPeriodEnd: endParam } : {}),
-        ...(dueParam ? { dueDate: dueParam } : {}),
-      },
-      customer: {
-        ...(baseInput.customer || SAMPLE_ISP_INVOICE_DATA.customer),
-        ...(nameParam ? { name: nameParam } : {}),
-        ...(cidParam ? { customerId: cidParam } : {}),
-        ...(connParam ? { connectionId: connParam } : {}),
-        ...(phoneParam ? { phone: phoneParam } : {}),
-        ...(addrParam
-          ? { billingAddress: addrParam, installationAddress: addrParam }
-          : {}),
-      },
-      items:
-        amtParam !== null || planParam !== null
-          ? [
-              {
-                description:
-                  planParam ||
-                  baseInput.items?.[0]?.description ||
-                  "Broadband Internet Subscription – 50 Mbps (Home 50 Mbps)",
-                sac: baseInput.items?.[0]?.sac || "998422",
-                billingPeriod: baseInput.items?.[0]?.billingPeriod || "15 Days",
-                quantity: baseInput.items?.[0]?.quantity || 1,
-                unitPrice: parsedAmount,
-                taxableAmount: parsedAmount,
-                gstRate: baseInput.items?.[0]?.gstRate ?? 18,
-              },
-            ]
-          : baseInput.items,
-      payment: {
-        ...(baseInput.payment || SAMPLE_ISP_INVOICE_DATA.payment),
-        ...(statusParam ? { status: statusParam } : {}),
-      },
-      qrCode: {
-        enabled: true,
-        url: "", // Let prepareIspInvoiceData build the exact verification URL for this invoice
-        label: baseInput.qrCode?.label || "Scan to View Invoice",
-      },
-    };
-
-    const invoiceData = await prepareIspInvoiceData(mergedInput, origin);
+    const invoiceData = await prepareIspInvoiceData(
+      dbInput || SAMPLE_ISP_INVOICE_DATA,
+      origin
+    );
 
     if (format === "json") {
       return NextResponse.json({
         success: true,
-        message: "15-day ISP broadband invoice schema and calculation",
+        source: dbInput ? "database" : "sample_fallback",
         data: invoiceData,
       });
     }
@@ -207,7 +274,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Failed to generate sample PDF";
+    const msg = err instanceof Error ? err.message : "Failed to generate PDF from database";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

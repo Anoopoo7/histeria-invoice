@@ -11,6 +11,7 @@ export default function IspGeneratorPage() {
   const [data, setData] = useState<IspInvoiceData>(SAMPLE_ISP_INVOICE_DATA);
   const [downloading, setDownloading] = useState(false);
   const [activeTab, setActiveTab] = useState<"preview" | "api" | "edit">("preview");
+  const [invoiceNumber, setInvoiceNumber] = useState("ISP/2026-27/000001");
   const [customerName, setCustomerName] = useState("Rahul Kumar");
   const [customerId, setCustomerId] = useState("ISP1001");
   const [connectionId, setConnectionId] = useState("CON1001");
@@ -19,31 +20,45 @@ export default function IspGeneratorPage() {
   const [qrUrl, setQrUrl] = useState(SAMPLE_ISP_INVOICE_DATA.qrCode.url);
   const [copied, setCopied] = useState(false);
 
-  // Generate QR code data on initial mount
+  // Generate QR code data and persist initial invoice in DB on mount
   const initializedRef = useRef<boolean | null>(null);
   if (initializedRef.current == null) {
     initializedRef.current = true;
     const origin =
       typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-    prepareIspInvoiceData({ ...SAMPLE_ISP_INVOICE_DATA, qrCode: { enabled: true, url: "", label: "Scan to View Invoice" } }, origin).then((prepared) => {
+    prepareIspInvoiceData(
+      {
+        ...SAMPLE_ISP_INVOICE_DATA,
+        qrCode: { enabled: true, url: "", label: "Scan to View Invoice" },
+      },
+      origin
+    ).then((prepared) => {
       setData(prepared);
       setQrUrl(prepared.qrCode.url);
+      if (typeof window !== "undefined") {
+        fetch("/api/isp/invoice?saveOnly=true", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(prepared),
+        }).catch(() => {});
+      }
     });
   }
 
   const applyChanges = async (
+    invNum: string,
     name: string,
     cId: string,
     connId: string,
     amount: number,
-    period: string,
-    customUrl?: string
+    period: string
   ) => {
     const origin =
       typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
     const [periodStart, periodEnd] = period.split(/\s*[–-]\s*/);
     const invoiceInfo = {
       ...SAMPLE_ISP_INVOICE_DATA.invoice,
+      invoiceNumber: invNum || "ISP/2026-27/000001",
       billingPeriodStart: periodStart || SAMPLE_ISP_INVOICE_DATA.invoice.billingPeriodStart,
       billingPeriodEnd: periodEnd || SAMPLE_ISP_INVOICE_DATA.invoice.billingPeriodEnd,
     };
@@ -66,29 +81,32 @@ export default function IspGeneratorPage() {
     ];
 
     const autoPreviewUrl = buildIspInvoicePreviewUrl(
-      { invoice: invoiceInfo, customer: customerInfo, items: itemsList },
+      { invoice: invoiceInfo },
       origin
     );
-    const effectiveQrUrl = customUrl !== undefined ? customUrl : autoPreviewUrl;
-    if (customUrl === undefined) {
-      setQrUrl(autoPreviewUrl);
-    }
+    setQrUrl(autoPreviewUrl);
 
-    const updated = await prepareIspInvoiceData(
-      {
-        ...SAMPLE_ISP_INVOICE_DATA,
-        invoice: invoiceInfo,
-        customer: customerInfo,
-        items: itemsList,
-        qrCode: {
-          enabled: true,
-          url: effectiveQrUrl,
-          label: "Scan to View Invoice / Pay Online",
-        },
+    const requestBody = {
+      ...SAMPLE_ISP_INVOICE_DATA,
+      invoice: invoiceInfo,
+      customer: customerInfo,
+      items: itemsList,
+      qrCode: {
+        enabled: true,
+        url: autoPreviewUrl,
+        label: "Scan to View Invoice / Pay Online",
       },
-      origin
-    );
+    };
+
+    const updated = await prepareIspInvoiceData(requestBody, origin);
     setData(updated);
+
+    // Save the invoice API request body in MongoDB so /api/isp/invoice?inv=... renders it from DB
+    fetch("/api/isp/invoice?saveOnly=true", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    }).catch(() => {});
   };
 
   const handleDownloadPdf = async () => {
@@ -227,12 +245,14 @@ export default function IspGeneratorPage() {
             </h2>
             <button
               onClick={() => {
+                setInvoiceNumber("ISP/2026-27/000001");
                 setCustomerName("Rahul Kumar");
                 setCustomerId("ISP1001");
                 setConnectionId("CON1001");
                 setPlanAmount(299);
                 setBillingPeriod("01 October 2026 – 15 October 2026");
                 applyChanges(
+                  "ISP/2026-27/000001",
                   "Rahul Kumar",
                   "ISP1001",
                   "CON1001",
@@ -249,6 +269,21 @@ export default function IspGeneratorPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
+                Invoice Number
+              </label>
+              <input
+                type="text"
+                value={invoiceNumber}
+                onChange={(e) => {
+                  setInvoiceNumber(e.target.value);
+                  applyChanges(e.target.value, customerName, customerId, connectionId, planAmount, billingPeriod);
+                }}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
                 Customer Name
               </label>
               <input
@@ -256,7 +291,7 @@ export default function IspGeneratorPage() {
                 value={customerName}
                 onChange={(e) => {
                   setCustomerName(e.target.value);
-                  applyChanges(e.target.value, customerId, connectionId, planAmount, billingPeriod);
+                  applyChanges(invoiceNumber, e.target.value, customerId, connectionId, planAmount, billingPeriod);
                 }}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 font-medium"
               />
@@ -271,7 +306,7 @@ export default function IspGeneratorPage() {
                 value={customerId}
                 onChange={(e) => {
                   setCustomerId(e.target.value);
-                  applyChanges(customerName, e.target.value, connectionId, planAmount, billingPeriod);
+                  applyChanges(invoiceNumber, customerName, e.target.value, connectionId, planAmount, billingPeriod);
                 }}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono"
               />
@@ -286,7 +321,7 @@ export default function IspGeneratorPage() {
                 value={connectionId}
                 onChange={(e) => {
                   setConnectionId(e.target.value);
-                  applyChanges(customerName, customerId, e.target.value, planAmount, billingPeriod);
+                  applyChanges(invoiceNumber, customerName, customerId, e.target.value, planAmount, billingPeriod);
                 }}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono"
               />
@@ -302,7 +337,7 @@ export default function IspGeneratorPage() {
                 onChange={(e) => {
                   const val = parseFloat(e.target.value) || 0;
                   setPlanAmount(val);
-                  applyChanges(customerName, customerId, connectionId, val, billingPeriod);
+                  applyChanges(invoiceNumber, customerName, customerId, connectionId, val, billingPeriod);
                 }}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 font-bold"
               />
@@ -320,24 +355,21 @@ export default function IspGeneratorPage() {
                 value={billingPeriod}
                 onChange={(e) => {
                   setBillingPeriod(e.target.value);
-                  applyChanges(customerName, customerId, connectionId, planAmount, e.target.value);
+                  applyChanges(invoiceNumber, customerName, customerId, connectionId, planAmount, e.target.value);
                 }}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
             </div>
 
-            <div>
+            <div className="sm:col-span-2 md:col-span-3">
               <label className="block font-semibold text-slate-700 mb-1">
-                Dynamic QR Code URL (PDF Preview Link)
+                QR Code Link (Auto-generated from Invoice Number &amp; Loaded from DB)
               </label>
               <input
                 type="text"
                 value={qrUrl}
-                onChange={(e) => {
-                  setQrUrl(e.target.value);
-                  applyChanges(customerName, customerId, connectionId, planAmount, billingPeriod, e.target.value);
-                }}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono text-[11px]"
+                readOnly
+                className="w-full px-3 py-2 bg-slate-100 text-slate-600 border border-slate-200 rounded-lg font-mono text-[11px] cursor-not-allowed"
               />
             </div>
           </div>

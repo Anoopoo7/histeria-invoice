@@ -79,7 +79,7 @@ export const SAMPLE_ISP_INVOICE_DATA: IspInvoiceData = {
   },
   qrCode: {
     enabled: true,
-    url: "http://localhost:3000/api/isp/invoice?inv=ISP%2F2026-27%2F000001&name=Rahul+Kumar&cid=ISP1001&conn=CON1001&amt=299",
+    url: "http://localhost:3000/api/isp/invoice?inv=ISP%2F2026-27%2F000001",
     label: "Scan to View Invoice",
   },
   footer: {
