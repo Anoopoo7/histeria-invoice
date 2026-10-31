@@ -261,20 +261,41 @@ export async function prepareIspInvoiceData(
   input: Partial<IspInvoiceData>,
   baseOrigin: string = ISP_QR_DOMAIN
 ): Promise<IspInvoiceData> {
+  const companyState = input.company?.state || "Kerala";
+  const rawCompanyStateCode = input.company?.stateCode || "32";
+  const normalizedCompanyStateCode =
+    companyState.toLowerCase() === "kerala" && rawCompanyStateCode === "01"
+      ? "32"
+      : rawCompanyStateCode;
+
+  const rawAddress =
+    input.company?.address || "Janatha Vision, SPI-03 Block, Varkala, Kerala, India";
+  const normalizedAddress = rawAddress.replace(/Janatha Vison/gi, "Janatha Vision");
+
   const company: IspCompany = {
-    brandName: input.company?.brandName || "Kerala Connect",
+    brandName: input.company?.brandName || "Janatha Vision",
     legalName: input.company?.legalName || "Kerala Broadband Services",
     logoUrl: input.company?.logoUrl,
-    address: input.company?.address || "Kerala, India",
-    city: input.company?.city || "Kollam",
-    state: input.company?.state || "Kerala",
-    stateCode: input.company?.stateCode || "32",
+    address: normalizedAddress,
+    city: input.company?.city || "Varkala",
+    state: companyState,
+    stateCode: normalizedCompanyStateCode,
     gstin: input.company?.gstin ?? "",
     pan: input.company?.pan ?? "",
-    phone: input.company?.phone || "+91 98765 43210",
-    email: input.company?.email || "support@keralaconnect.net",
-    website: input.company?.website || "www.keralaconnect.net",
+    phone: input.company?.phone || "+91 9895062592",
+    email: input.company?.email || "support@janathavision.net",
+    website: input.company?.website || "janathavision.net",
   };
+
+  const rawPlaceOfSupply = input.invoice?.placeOfSupply || "32 - Kerala";
+  const normalizedPlaceOfSupply = rawPlaceOfSupply.replace(/^01\s*-\s*Kerala/i, "32 - Kerala");
+  const rawPosCode =
+    input.invoice?.placeOfSupplyCode ||
+    (normalizedPlaceOfSupply.match(/^\d+/)?.[0] ?? "32");
+  const normalizedPosCode =
+    normalizedPlaceOfSupply.toLowerCase().includes("kerala") && rawPosCode === "01"
+      ? "32"
+      : rawPosCode;
 
   const invoice: IspInvoiceInfo = {
     invoiceNumber: input.invoice?.invoiceNumber || "ISP/2026-27/000001",
@@ -283,43 +304,57 @@ export async function prepareIspInvoiceData(
     billingPeriodEnd: input.invoice?.billingPeriodEnd || "15 October 2026",
     billingCycle: input.invoice?.billingCycle || "15 Days",
     dueDate: input.invoice?.dueDate || "05 November 2026",
-    placeOfSupply: input.invoice?.placeOfSupply || "32 - Kerala",
-    placeOfSupplyCode:
-      input.invoice?.placeOfSupplyCode ||
-      (input.invoice?.placeOfSupply?.match(/^\d+/)?.[0] ?? "32"),
+    placeOfSupply: normalizedPlaceOfSupply,
+    placeOfSupplyCode: normalizedPosCode,
     reverseCharge: input.invoice?.reverseCharge ?? "No",
   };
 
+  const custState = input.customer?.state || "Kerala";
+  const rawCustStateCode = input.customer?.stateCode || "32";
+  const normalizedCustStateCode =
+    custState.toLowerCase() === "kerala" && rawCustStateCode === "01"
+      ? "32"
+      : rawCustStateCode;
+
   const customer: IspCustomer = {
-    name: input.customer?.name || "Rahul Kumar",
-    customerId: input.customer?.customerId || "ISP1001",
-    connectionId: input.customer?.connectionId || "CON1001",
-    phone: input.customer?.phone || "9876543210",
-    email: input.customer?.email || "rahul.kumar@example.com",
-    billingAddress: input.customer?.billingAddress || "Kollam, Kerala",
+    name: input.customer?.name || "Anoop SS",
+    customerId: input.customer?.customerId || "ISP0092901",
+    connectionId: input.customer?.connectionId || "CON92992",
+    phone: input.customer?.phone || "+91 9526050158",
+    email: input.customer?.email || "anoopsunitha007@gmail.com",
+    billingAddress:
+      input.customer?.billingAddress ||
+      "Panayil veedu, parthukonam, kavalayoor, varkala - 695144",
     installationAddress:
       input.customer?.installationAddress ||
       input.customer?.billingAddress ||
-      "Kollam, Kerala",
-    state: input.customer?.state || "Kerala",
-    stateCode: input.customer?.stateCode || "32",
+      "Panayil veedu, parthukonam, kavalayoor, varkala - 695144",
+    state: custState,
+    stateCode: normalizedCustStateCode,
     gstin: input.customer?.gstin,
   };
 
-  const rawItems: IspServiceItem[] =
+  const isGstRegistered = Boolean(company.gstin && company.gstin.trim().length > 0);
+
+  const rawItems: IspServiceItem[] = (
     input.items && input.items.length > 0
       ? input.items
       : [
-        {
-          description: "Broadband Internet Subscription – 50 Mbps",
-          sac: "998422",
-          billingPeriod: "15 Days",
-          quantity: 1,
-          unitPrice: 299.0,
-          taxableAmount: 299.0,
-          gstRate: 18,
-        },
-      ];
+          {
+            description: "Special Plan – 120 Mbps (Home 120 Mbps)",
+            sac: "998422",
+            billingPeriod: "15 Days",
+            quantity: 1,
+            unitPrice: 1650.0,
+            taxableAmount: 1650.0,
+            gstRate: 0,
+          },
+        ]
+  ).map((item) => ({
+    ...item,
+    // If company is not GST-registered (no GSTIN), do not charge GST (0%)
+    gstRate: isGstRegistered ? (item.gstRate ?? 18) : 0,
+  }));
 
   const discountAmount = input.gst?.discount || 0;
   const { items, gst } = calculateIspGst(
@@ -329,33 +364,51 @@ export async function prepareIspInvoiceData(
     invoice.placeOfSupplyCode || customer.stateCode
   );
 
+  const paymentStatus = input.payment?.status || "PAID";
+  const isPaid = paymentStatus === "PAID";
   const prevBalance = round2(input.payment?.previousBalance || 0);
-  const prevPayments = round2(input.payment?.previousPayments || 0);
-  const outstanding = round2(prevBalance - prevPayments + gst.finalInvoiceAmount);
+  const prevPayments =
+    input.payment?.previousPayments !== undefined && input.payment.previousPayments > 0
+      ? round2(input.payment.previousPayments)
+      : isPaid
+        ? round2(prevBalance + gst.finalInvoiceAmount)
+        : 0;
+  const rawOutstanding = round2(prevBalance - prevPayments + gst.finalInvoiceAmount);
+  const outstandingBalance = isPaid
+    ? round2(input.payment?.outstandingBalance ?? 0)
+    : Math.max(0, rawOutstanding);
+  const totalAmountPayable = isPaid
+    ? round2(input.payment?.totalAmountPayable ?? 0)
+    : Math.max(0, rawOutstanding);
+
+  const rawBankName = input.payment?.bankName || "HDFC Bank";
+  const normalizedBankName =
+    rawBankName.toLowerCase() === "hdfc" ? "HDFC Bank" : rawBankName;
 
   const payment: IspPaymentSummary = {
     previousBalance: prevBalance,
     currentInvoiceAmount: gst.finalInvoiceAmount,
     previousPayments: prevPayments,
-    outstandingBalance: Math.max(0, outstanding),
-    totalAmountPayable: Math.max(0, outstanding),
-    status: input.payment?.status || "UNPAID",
-    upiId: input.payment?.upiId || "keralaconnect@upi",
-    bankName: input.payment?.bankName || "Federal Bank",
-    accountNumber: input.payment?.accountNumber || "12340200056789",
-    ifsc: input.payment?.ifsc || "FDRL0001234",
-    branch: input.payment?.branch || "Kollam Main Branch",
+    outstandingBalance,
+    totalAmountPayable,
+    status: paymentStatus,
+    upiId: input.payment?.upiId || "9526050158@okhdfcbank",
+    bankName: normalizedBankName,
+    accountNumber: input.payment?.accountNumber || "**** **** **** 6400",
+    ifsc: input.payment?.ifsc || "HDFC0001492",
+    branch: input.payment?.branch || "Varkala",
     paymentInstructions:
       input.payment?.paymentInstructions ||
-      "Please pay on or before the due date to avoid service disconnection. Use your Connection ID as reference.",
+      (isPaid
+        ? "Payment received in full. Thank you for your prompt payment."
+        : "Please pay on or before the due date to avoid service disconnection. Use your Connection ID as reference."),
     paymentReference: input.payment?.paymentReference,
   };
 
   // QR Code configuration: Always encode /api/isp/invoice?inv=<invoiceNumber>
   const qrEnabled = input.qrCode?.enabled !== false;
   const qrUrl = buildIspInvoicePreviewUrl({ invoice }, baseOrigin);
-  const qrLabel =
-    input.qrCode?.label || "Scan to View Invoice / Pay Online";
+  const qrLabel = input.qrCode?.label || "Scan to View Invoice";
 
   let qrDataUri = "";
   if (qrEnabled && qrUrl) {
@@ -372,21 +425,23 @@ export async function prepareIspInvoiceData(
   const footer: IspFooterConfig = {
     amountInWords: gst.amountInWords,
     terms: input.footer?.terms || [
-      "This invoice is issued for the 15-day billing cycle specified above.",
-      "Payments must be made on or before the due date to ensure uninterrupted broadband connectivity.",
-      "Charges are billed strictly in advance according to the subscribed telecom plan.",
-      "For queries or complaints regarding billing, contact customer support within 7 days of invoice date.",
+      "This invoice is issued for the 15-day broadband subscription cycle specified above.",
+      "Payment for this billing cycle has been received and recorded against your Connection ID.",
+      "Charges are billed according to your subscribed broadband plan.",
+      "For queries or support regarding your connection or billing, please contact customer support.",
     ],
     dueDateReminder:
       input.footer?.dueDateReminder ||
-      `Please clear the payable amount on or before ${invoice.dueDate} to prevent automated disconnection.`,
+      (isPaid
+        ? "This invoice is PAID in full. No further payment is due for this billing period."
+        : `Please clear the payable amount on or before ${invoice.dueDate} to prevent automated disconnection.`),
     supportPhone: input.footer?.supportPhone || company.phone,
     supportEmail: input.footer?.supportEmail || company.email,
     thankYouMessage:
       input.footer?.thankYouMessage ||
       "Thank you for choosing us. We appreciate your trust in our services.\nYour connection matters to us. For assistance, contact our customer support team.",
     authorizedSignatoryTitle:
-      input.footer?.authorizedSignatoryTitle || "Authorized Signatory",
+      input.footer?.authorizedSignatoryTitle || company.brandName || "Authorized Signatory",
     isComputerGeneratedDeclaration:
       input.footer?.isComputerGeneratedDeclaration !== false,
     eInvoice: input.footer?.eInvoice,

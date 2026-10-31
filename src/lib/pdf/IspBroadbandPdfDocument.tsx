@@ -533,10 +533,10 @@ export function IspBroadbandPdfDocument({ data }: { data: IspInvoiceData }) {
 
   return (
     <Document
-      title={`Tax Invoice ${invoice.invoiceNumber}`}
+      title={`Payment Invoice ${invoice.invoiceNumber}`}
       author={company.legalName}
-      subject="Broadband Internet Subscription GST Tax Invoice"
-      keywords="ISP, Broadband, GST, Invoice, Kerala, Telecom"
+      subject="Broadband Internet Subscription Payment Invoice"
+      keywords="ISP, Broadband, Invoice, Kerala, Telecom"
     >
       <Page size="A4" style={styles.page}>
         {/* SECTION A: Company Header */}
@@ -676,10 +676,12 @@ export function IspBroadbandPdfDocument({ data }: { data: IspInvoiceData }) {
               <Text style={styles.metaLabel}>Place of Supply:</Text>
               <Text style={styles.metaValue}>{invoice.placeOfSupply}</Text>
             </View>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>Reverse Charge:</Text>
-              <Text style={styles.metaValue}>{String(invoice.reverseCharge)}</Text>
-            </View>
+            {company.gstin ? (
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Reverse Charge:</Text>
+                <Text style={styles.metaValue}>{String(invoice.reverseCharge)}</Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -693,7 +695,7 @@ export function IspBroadbandPdfDocument({ data }: { data: IspInvoiceData }) {
             </Text>
             <Text style={[styles.thText, styles.colQty]}>Qty</Text>
             <Text style={[styles.thText, styles.colAmount]}>
-              Taxable Amount
+              {gst.totalGst > 0 || company.gstin ? "Taxable Amount" : "Amount"}
             </Text>
           </View>
 
@@ -730,7 +732,7 @@ export function IspBroadbandPdfDocument({ data }: { data: IspInvoiceData }) {
           </Text>
         </View>
 
-        {/* LOWER SECTION: Payment Summary & GST Summary & Dynamic QR Code */}
+        {/* LOWER SECTION: Payment Summary & Invoice/GST Summary & Dynamic QR Code */}
         <View style={styles.lowerContainer}>
           {/* Section F: Payment Summary */}
           <View style={styles.leftPaymentCol}>
@@ -757,9 +759,13 @@ export function IspBroadbandPdfDocument({ data }: { data: IspInvoiceData }) {
             </View>
             {payment.previousPayments > 0 && (
               <View style={styles.paymentRow}>
-                <Text style={styles.metaLabel}>Previous Payments:</Text>
+                <Text style={styles.metaLabel}>
+                  {payment.status === "PAID" ? "Amount Paid:" : "Previous Payments:"}
+                </Text>
                 <Text style={[styles.cellText, { color: "#15803d" }]}>
-                  -{formatCurrency(payment.previousPayments)}
+                  {payment.status === "PAID"
+                    ? formatCurrency(payment.previousPayments)
+                    : `-${formatCurrency(payment.previousPayments)}`}
                 </Text>
               </View>
             )}
@@ -817,11 +823,14 @@ export function IspBroadbandPdfDocument({ data }: { data: IspInvoiceData }) {
             </View>
           </View>
 
-          {/* Section E: GST Summary & Section G: QR Code */}
+          {/* Section E: Invoice / GST Summary & Section G: QR Code */}
           <View style={styles.rightTaxCol}>
-            {/* GST Summary */}
             <View style={styles.taxCard}>
-              <Text style={styles.sectionHeading}>GST Tax Computation</Text>
+              <Text style={styles.sectionHeading}>
+                {gst.totalGst > 0 || company.gstin
+                  ? "GST Tax Computation"
+                  : "Invoice Summary"}
+              </Text>
 
               <View style={styles.taxRow}>
                 <Text style={styles.metaLabel}>Subtotal:</Text>
@@ -839,52 +848,55 @@ export function IspBroadbandPdfDocument({ data }: { data: IspInvoiceData }) {
                 </View>
               )}
 
-              <View style={styles.taxRow}>
-                <Text style={[styles.metaLabel, styles.bold]}>
-                  Taxable Value:
-                </Text>
-                <Text style={[styles.cellText, styles.bold]}>
-                  {formatCurrency(gst.taxableValue)}
-                </Text>
-              </View>
-
-              {/* Tax components: CGST + SGST or IGST */}
-              {!gst.isInterState ? (
+              {(gst.totalGst > 0 || Boolean(company.gstin)) && (
                 <>
                   <View style={styles.taxRow}>
-                    <Text style={styles.metaLabel}>
-                      CGST ({gst.cgstRate}%):
+                    <Text style={[styles.metaLabel, styles.bold]}>
+                      Taxable Value:
                     </Text>
-                    <Text style={styles.cellText}>
-                      {formatCurrency(gst.cgstAmount)}
+                    <Text style={[styles.cellText, styles.bold]}>
+                      {formatCurrency(gst.taxableValue)}
                     </Text>
                   </View>
+
+                  {!gst.isInterState ? (
+                    <>
+                      <View style={styles.taxRow}>
+                        <Text style={styles.metaLabel}>
+                          CGST ({gst.cgstRate}%):
+                        </Text>
+                        <Text style={styles.cellText}>
+                          {formatCurrency(gst.cgstAmount)}
+                        </Text>
+                      </View>
+                      <View style={styles.taxRow}>
+                        <Text style={styles.metaLabel}>
+                          SGST ({gst.sgstRate}%):
+                        </Text>
+                        <Text style={styles.cellText}>
+                          {formatCurrency(gst.sgstAmount)}
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
+                    <View style={styles.taxRow}>
+                      <Text style={styles.metaLabel}>
+                        IGST ({gst.igstRate}%):
+                      </Text>
+                      <Text style={styles.cellText}>
+                        {formatCurrency(gst.igstAmount)}
+                      </Text>
+                    </View>
+                  )}
+
                   <View style={styles.taxRow}>
-                    <Text style={styles.metaLabel}>
-                      SGST ({gst.sgstRate}%):
-                    </Text>
+                    <Text style={styles.metaLabel}>Total GST:</Text>
                     <Text style={styles.cellText}>
-                      {formatCurrency(gst.sgstAmount)}
+                      {formatCurrency(gst.totalGst)}
                     </Text>
                   </View>
                 </>
-              ) : (
-                <View style={styles.taxRow}>
-                  <Text style={styles.metaLabel}>
-                    IGST ({gst.igstRate}%):
-                  </Text>
-                  <Text style={styles.cellText}>
-                    {formatCurrency(gst.igstAmount)}
-                  </Text>
-                </View>
               )}
-
-              <View style={styles.taxRow}>
-                <Text style={styles.metaLabel}>Total GST:</Text>
-                <Text style={styles.cellText}>
-                  {formatCurrency(gst.totalGst)}
-                </Text>
-              </View>
 
               <View style={styles.taxTotalRow}>
                 <Text style={styles.grandTotalLabel}>Final Invoice Total:</Text>
@@ -900,11 +912,11 @@ export function IspBroadbandPdfDocument({ data }: { data: IspInvoiceData }) {
                 <Image src={qrCode.dataUri} style={styles.qrImage} />
                 <View style={styles.qrInfo}>
                   <Text style={styles.qrHeading}>
-                    {qrCode.label || "Scan to View / Pay"}
+                    {qrCode.label || "Scan to View Invoice"}
                   </Text>
                   <Text style={styles.qrCaption}>
-                    Use any camera app or UPI app to view digital bill and pay
-                    instantly.
+                    Scan with your phone camera to view and verify this digital
+                    invoice online.
                   </Text>
                 </View>
               </View>
@@ -936,6 +948,9 @@ export function IspBroadbandPdfDocument({ data }: { data: IspInvoiceData }) {
             </View>
 
             <View style={styles.signatoryBlock}>
+              <Text style={styles.signatoryTitle}>
+                {footer.authorizedSignatoryTitle || company.brandName}
+              </Text>
               <Image
                 src="https://png.pngtree.com/png-clipart/20230317/original/pngtree-paid-stamp-vector-illustration-png-image_8991938.png"
                 style={styles.digitalSealImage}
@@ -947,7 +962,7 @@ export function IspBroadbandPdfDocument({ data }: { data: IspInvoiceData }) {
           <View style={styles.bottomDisclaimer}>
             <Text style={styles.disclaimerText}>
               {footer.isComputerGeneratedDeclaration
-                ? "This is a computer-generated tax invoice and does not require a physical signature."
+                ? "This is a computer-generated invoice and does not require a physical signature."
                 : ""}
             </Text>
             <Text

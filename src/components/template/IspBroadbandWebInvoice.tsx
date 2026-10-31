@@ -171,18 +171,22 @@ export function IspBroadbandWebInvoice({ data }: { data: IspInvoiceData }) {
               {invoice.billingCycle || "15 Days"}
             </span>
           </div>
-          <div className="flex justify-between py-0.5">
-            <span className="text-slate-500">Due Date:</span>
-            <span className="font-bold text-red-600">{invoice.dueDate}</span>
-          </div>
+          {payment.status !== "PAID" && (
+            <div className="flex justify-between py-0.5">
+              <span className="text-slate-500">Due Date:</span>
+              <span className="font-bold text-red-600">{invoice.dueDate}</span>
+            </div>
+          )}
           <div className="flex justify-between py-0.5">
             <span className="text-slate-500">Place of Supply:</span>
             <span className="font-semibold text-slate-800">{invoice.placeOfSupply}</span>
           </div>
-          <div className="flex justify-between py-0.5">
-            <span className="text-slate-500">Reverse Charge:</span>
-            <span className="font-semibold text-slate-800">{String(invoice.reverseCharge)}</span>
-          </div>
+          {company.gstin && (
+            <div className="flex justify-between py-0.5">
+              <span className="text-slate-500">Reverse Charge:</span>
+              <span className="font-semibold text-slate-800">{String(invoice.reverseCharge)}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -195,7 +199,9 @@ export function IspBroadbandWebInvoice({ data }: { data: IspInvoiceData }) {
               <th className="py-2.5 px-3 text-center">SAC</th>
               <th className="py-2.5 px-3 text-center">Billing Period</th>
               <th className="py-2.5 px-3 text-center">Qty</th>
-              <th className="py-2.5 px-3 text-right">Taxable Amount</th>
+              <th className="py-2.5 px-3 text-right">
+                {gst.totalGst > 0 || company.gstin ? "Taxable Amount" : "Amount"}
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -204,7 +210,8 @@ export function IspBroadbandWebInvoice({ data }: { data: IspInvoiceData }) {
                 <td className="py-3 px-3">
                   <div className="font-bold text-slate-900">{item.description}</div>
                   <div className="text-[10px] text-slate-400">
-                    Rate: {formatCurrency(item.unitPrice)} | GST: {item.gstRate || 18}%
+                    SAC Code: {item.sac || "998422"} | Rate: {formatCurrency(item.unitPrice)}
+                    {gst.totalGst > 0 || company.gstin ? ` | GST: ${item.gstRate ?? 0}%` : ""}
                   </div>
                 </td>
                 <td className="py-3 px-3 text-center font-medium text-slate-600">
@@ -235,7 +242,7 @@ export function IspBroadbandWebInvoice({ data }: { data: IspInvoiceData }) {
         </span>
       </div>
 
-      {/* LOWER SECTION: Payment Summary & GST Breakdown & QR Code */}
+      {/* LOWER SECTION: Payment Summary & Invoice/GST Breakdown & QR Code */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-5 mb-5">
         {/* Section F: Payment Summary */}
         <div className="md:col-span-6 bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2 text-xs">
@@ -269,9 +276,15 @@ export function IspBroadbandWebInvoice({ data }: { data: IspInvoiceData }) {
               </span>
             </div>
             {payment.previousPayments > 0 && (
-              <div className="flex justify-between text-emerald-700">
-                <span>Previous Payments:</span>
-                <span>-{formatCurrency(payment.previousPayments)}</span>
+              <div className="flex justify-between text-emerald-700 font-semibold">
+                <span>
+                  {payment.status === "PAID" ? "Amount Paid:" : "Previous Payments:"}
+                </span>
+                <span>
+                  {payment.status === "PAID"
+                    ? formatCurrency(payment.previousPayments)
+                    : `-${formatCurrency(payment.previousPayments)}`}
+                </span>
               </div>
             )}
             <div className="flex justify-between">
@@ -325,11 +338,13 @@ export function IspBroadbandWebInvoice({ data }: { data: IspInvoiceData }) {
           </div>
         </div>
 
-        {/* Section E: GST Summary & Section G: Dynamic QR Code */}
+        {/* Section E: Invoice/GST Summary & Section G: Dynamic QR Code */}
         <div className="md:col-span-6 flex flex-col justify-between gap-4">
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2 text-xs">
             <h2 className="text-[11px] font-bold uppercase tracking-wider text-sky-700 border-b border-slate-200 pb-1.5">
-              GST Tax Computation
+              {gst.totalGst > 0 || company.gstin
+                ? "GST Tax Computation"
+                : "Invoice Summary"}
             </h2>
 
             <div className="space-y-1.5 pt-1">
@@ -345,39 +360,44 @@ export function IspBroadbandWebInvoice({ data }: { data: IspInvoiceData }) {
                   <span>-{formatCurrency(gst.discount)}</span>
                 </div>
               )}
-              <div className="flex justify-between font-bold text-slate-900 border-t border-slate-200 pt-1">
-                <span>Taxable Value:</span>
-                <span>{formatCurrency(gst.taxableValue)}</span>
-              </div>
 
-              {!gst.isInterState ? (
+              {(gst.totalGst > 0 || Boolean(company.gstin)) && (
                 <>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">CGST ({gst.cgstRate}%):</span>
-                    <span className="font-medium text-slate-800">
-                      {formatCurrency(gst.cgstAmount)}
-                    </span>
+                  <div className="flex justify-between font-bold text-slate-900 border-t border-slate-200 pt-1">
+                    <span>Taxable Value:</span>
+                    <span>{formatCurrency(gst.taxableValue)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">SGST ({gst.sgstRate}%):</span>
-                    <span className="font-medium text-slate-800">
-                      {formatCurrency(gst.sgstAmount)}
-                    </span>
+
+                  {!gst.isInterState ? (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">CGST ({gst.cgstRate}%):</span>
+                        <span className="font-medium text-slate-800">
+                          {formatCurrency(gst.cgstAmount)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">SGST ({gst.sgstRate}%):</span>
+                        <span className="font-medium text-slate-800">
+                          {formatCurrency(gst.sgstAmount)}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">IGST ({gst.igstRate}%):</span>
+                      <span className="font-medium text-slate-800">
+                        {formatCurrency(gst.igstAmount)}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between text-slate-600">
+                    <span>Total GST:</span>
+                    <span>{formatCurrency(gst.totalGst)}</span>
                   </div>
                 </>
-              ) : (
-                <div className="flex justify-between">
-                  <span className="text-slate-500">IGST ({gst.igstRate}%):</span>
-                  <span className="font-medium text-slate-800">
-                    {formatCurrency(gst.igstAmount)}
-                  </span>
-                </div>
               )}
-
-              <div className="flex justify-between text-slate-600">
-                <span>Total GST:</span>
-                <span>{formatCurrency(gst.totalGst)}</span>
-              </div>
 
               <div className="flex justify-between text-sm font-extrabold text-slate-900 border-t border-slate-300 pt-2">
                 <span>Final Invoice Amount:</span>
@@ -397,10 +417,10 @@ export function IspBroadbandWebInvoice({ data }: { data: IspInvoiceData }) {
               />
               <div className="text-xs space-y-0.5 min-w-0">
                 <span className="font-bold text-slate-900 block truncate">
-                  {qrCode.label || "Scan to View / Pay"}
+                  {qrCode.label || "Scan to View Invoice"}
                 </span>
                 <p className="text-[11px] text-slate-500 leading-tight">
-                  Scan using any UPI or camera app to view bill or pay instantly.
+                  Scan with your phone camera to view and verify this digital invoice online.
                 </p>
                 <a
                   href={qrCode.url}
@@ -436,7 +456,7 @@ export function IspBroadbandWebInvoice({ data }: { data: IspInvoiceData }) {
 
           <div className="flex flex-col items-end text-right sm:self-end">
             <div className="font-bold text-slate-900 text-xs mb-1">
-              {footer.authorizedSignatoryTitle || `For ${company.legalName}`}
+              {footer.authorizedSignatoryTitle || company.brandName}
             </div>
 
             {/* Digital Seal Image (PAID) */}
@@ -451,7 +471,7 @@ export function IspBroadbandWebInvoice({ data }: { data: IspInvoiceData }) {
 
         {footer.isComputerGeneratedDeclaration && (
           <div className="text-[10px] text-slate-400 text-center pt-2 border-t border-slate-100">
-            This is a computer-generated tax invoice and does not require a physical signature.
+            This is a computer-generated invoice and does not require a physical signature.
           </div>
         )}
       </div>

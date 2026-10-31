@@ -12,10 +12,10 @@ export default function IspGeneratorPage() {
   const [downloading, setDownloading] = useState(false);
   const [activeTab, setActiveTab] = useState<"preview" | "api" | "edit">("preview");
   const [invoiceNumber, setInvoiceNumber] = useState("ISP/2026-27/000001");
-  const [customerName, setCustomerName] = useState("Rahul Kumar");
-  const [customerId, setCustomerId] = useState("ISP1001");
-  const [connectionId, setConnectionId] = useState("CON1001");
-  const [planAmount, setPlanAmount] = useState(299);
+  const [customerName, setCustomerName] = useState("Anoop SS");
+  const [customerId, setCustomerId] = useState("ISP0092901");
+  const [connectionId, setConnectionId] = useState("CON92992");
+  const [planAmount, setPlanAmount] = useState(1650);
   const [billingPeriod, setBillingPeriod] = useState("01 October 2026 – 15 October 2026");
   const [qrUrl, setQrUrl] = useState(SAMPLE_ISP_INVOICE_DATA.qrCode.url);
   const [copied, setCopied] = useState(false);
@@ -66,13 +66,13 @@ export default function IspGeneratorPage() {
     };
     const itemsList = [
       {
-        description: `Broadband Internet Subscription – 50 Mbps (Home 50 Mbps)`,
+        description: `Special Plan – 120 Mbps (Home 120 Mbps)`,
         sac: "998422",
         billingPeriod: "15 Days",
         quantity: 1,
         unitPrice: Number(amount),
         taxableAmount: Number(amount),
-        gstRate: 18,
+        gstRate: 0,
       },
     ];
 
@@ -242,17 +242,17 @@ export default function IspGeneratorPage() {
             <button
               onClick={() => {
                 setInvoiceNumber("ISP/2026-27/000001");
-                setCustomerName("Rahul Kumar");
-                setCustomerId("ISP1001");
-                setConnectionId("CON1001");
-                setPlanAmount(299);
+                setCustomerName("Anoop SS");
+                setCustomerId("ISP0092901");
+                setConnectionId("CON92992");
+                setPlanAmount(1650);
                 setBillingPeriod("01 October 2026 – 15 October 2026");
                 applyChanges(
                   "ISP/2026-27/000001",
-                  "Rahul Kumar",
-                  "ISP1001",
-                  "CON1001",
-                  299,
+                  "Anoop SS",
+                  "ISP0092901",
+                  "CON92992",
+                  1650,
                   "01 October 2026 – 15 October 2026"
                 );
               }}
