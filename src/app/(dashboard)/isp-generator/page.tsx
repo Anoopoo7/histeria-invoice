@@ -4,7 +4,7 @@ import React, { useState, useRef } from "react";
 import { Download, ExternalLink, Loader2, RefreshCw, Code, CheckCircle2 } from "lucide-react";
 import { SAMPLE_ISP_INVOICE_DATA } from "@/lib/templates/ispSampleData";
 import { IspInvoiceData } from "@/types/isp";
-import { prepareIspInvoiceData, buildIspInvoicePreviewUrl } from "@/lib/calculations/isp";
+import { prepareIspInvoiceData, buildIspInvoicePreviewUrl, ISP_QR_DOMAIN } from "@/lib/calculations/isp";
 import { IspBroadbandWebInvoice } from "@/components/template/IspBroadbandWebInvoice";
 
 export default function IspGeneratorPage() {
@@ -24,14 +24,12 @@ export default function IspGeneratorPage() {
   const initializedRef = useRef<boolean | null>(null);
   if (initializedRef.current == null) {
     initializedRef.current = true;
-    const origin =
-      typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
     prepareIspInvoiceData(
       {
         ...SAMPLE_ISP_INVOICE_DATA,
         qrCode: { enabled: true, url: "", label: "Scan to View Invoice" },
       },
-      origin
+      ISP_QR_DOMAIN
     ).then((prepared) => {
       setData(prepared);
       setQrUrl(prepared.qrCode.url);
@@ -53,8 +51,6 @@ export default function IspGeneratorPage() {
     amount: number,
     period: string
   ) => {
-    const origin =
-      typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
     const [periodStart, periodEnd] = period.split(/\s*[–-]\s*/);
     const invoiceInfo = {
       ...SAMPLE_ISP_INVOICE_DATA.invoice,
@@ -82,7 +78,7 @@ export default function IspGeneratorPage() {
 
     const autoPreviewUrl = buildIspInvoicePreviewUrl(
       { invoice: invoiceInfo },
-      origin
+      ISP_QR_DOMAIN
     );
     setQrUrl(autoPreviewUrl);
 
@@ -98,7 +94,7 @@ export default function IspGeneratorPage() {
       },
     };
 
-    const updated = await prepareIspInvoiceData(requestBody, origin);
+    const updated = await prepareIspInvoiceData(requestBody, ISP_QR_DOMAIN);
     setData(updated);
 
     // Save the invoice API request body in MongoDB so /api/isp/invoice?inv=... renders it from DB
@@ -453,7 +449,7 @@ export default function IspGeneratorPage() {
     ],
     "qrCode": {
       "enabled": true,
-      "url": "http://localhost:3000/api/isp/invoice",
+      "url": "https://histeriainvoice.vercel.app/api/isp/invoice?inv=ISP%2F2026-27%2F000001",
       "label": "Scan to View Invoice"
     }
   }' \\
