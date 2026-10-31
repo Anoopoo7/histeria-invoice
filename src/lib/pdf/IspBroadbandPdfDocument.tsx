@@ -9,6 +9,7 @@ import {
   Image,
 } from "@react-pdf/renderer";
 import { IspInvoiceData } from "@/types/isp";
+import { DEFAULT_ISP_LOGO_DATA_URI } from "@/lib/templates/ispLogoDataUri";
 
 const ACCENT_COLOR = "#0284c7"; // Clean Telecom Sky / Blue
 const ACCENT_DARK = "#0f172a"; // Deep Slate
@@ -45,25 +46,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 3,
   },
-  logoBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 5,
-    backgroundColor: ACCENT_DARK,
+  logoFrame: {
+    width: 44,
+    height: 44,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    backgroundColor: "#ffffff",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 8,
-  },
-  logoText: {
-    color: "#ffffff",
-    fontFamily: "Helvetica-Bold",
-    fontSize: 13,
+    padding: 3,
+    marginRight: 10,
   },
   companyLogoImage: {
-    height: 28,
-    maxWidth: 90,
+    width: "100%",
+    height: "100%",
     objectFit: "contain",
-    marginRight: 8,
   },
   brandName: {
     fontSize: 16,
@@ -545,13 +543,12 @@ export function IspBroadbandPdfDocument({ data }: { data: IspInvoiceData }) {
         <View style={styles.headerContainer}>
           <View style={styles.companyCol}>
             <View style={styles.brandRow}>
-              {company.logoUrl ? (
-                <Image src={company.logoUrl} style={styles.companyLogoImage} />
-              ) : (
-                <View style={styles.logoBadge}>
-                  <Text style={styles.logoText}>KC</Text>
-                </View>
-              )}
+              <View style={styles.logoFrame}>
+                <Image
+                  src={company.logoUrl || DEFAULT_ISP_LOGO_DATA_URI}
+                  style={styles.companyLogoImage}
+                />
+              </View>
               <View>
                 <Text style={styles.brandName}>{company.brandName}</Text>
                 <Text style={styles.legalName}>{company.legalName}</Text>
@@ -585,7 +582,7 @@ export function IspBroadbandPdfDocument({ data }: { data: IspInvoiceData }) {
           </View>
 
           <View style={styles.titleCol}>
-            <Text style={styles.invoiceTitle}>TAX INVOICE</Text>
+            <Text style={styles.invoiceTitle}>PAYMENT INVOICE</Text>
             <Text style={styles.invoiceSubtitle}>
               Broadband Telecom Service
             </Text>
@@ -784,7 +781,7 @@ export function IspBroadbandPdfDocument({ data }: { data: IspInvoiceData }) {
             {/* Bank / UPI Payment Info */}
             <View style={styles.bankDetailsBox}>
               <Text style={[styles.addressLabel, { marginBottom: 2 }]}>
-                Payment Remittance Details:
+                Payment Details:
               </Text>
               {payment.upiId ? (
                 <Text style={styles.bankText}>

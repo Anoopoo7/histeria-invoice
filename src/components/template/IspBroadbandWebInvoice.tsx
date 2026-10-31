@@ -3,7 +3,8 @@
 import React from "react";
 import { IspInvoiceData } from "@/types/isp";
 import { formatCurrency } from "@/lib/utils/cn";
-import { Wifi, Phone, Mail, Globe } from "lucide-react";
+import { Phone, Mail, Globe } from "lucide-react";
+import { DEFAULT_ISP_LOGO_DATA_URI } from "@/lib/templates/ispLogoDataUri";
 
 export function IspBroadbandWebInvoice({ data }: { data: IspInvoiceData }) {
   const {
@@ -27,19 +28,15 @@ export function IspBroadbandWebInvoice({ data }: { data: IspInvoiceData }) {
       {/* SECTION A: Company Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-5 border-b-2 border-sky-600">
         <div className="space-y-1">
-          <div className="flex items-center gap-2.5">
-            {company.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
+          <div className="flex items-center gap-3">
+            <div className="w-14 h-14 rounded-lg border border-slate-300 bg-white p-1 flex items-center justify-center shadow-xs shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={company.logoUrl}
+                src={company.logoUrl || DEFAULT_ISP_LOGO_DATA_URI}
                 alt={company.brandName}
-                className="h-8 max-w-[120px] object-contain"
+                className="w-full h-full object-contain"
               />
-            ) : (
-              <div className="w-9 h-9 rounded-lg bg-slate-900 text-white flex items-center justify-center font-black text-sm shadow-sm">
-                <Wifi className="w-5 h-5 text-sky-400" />
-              </div>
-            )}
+            </div>
             <div>
               <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none">
                 {company.brandName}
@@ -293,7 +290,7 @@ export function IspBroadbandWebInvoice({ data }: { data: IspInvoiceData }) {
 
           <div className="border-t border-slate-200 pt-2 mt-3 space-y-1 text-[11px]">
             <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">
-              Payment Remittance Details:
+              Payment Details:
             </span>
             {payment.upiId && (
               <div className="flex justify-between">
