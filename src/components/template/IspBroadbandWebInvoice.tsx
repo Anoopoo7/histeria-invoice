@@ -437,13 +437,18 @@ export function IspBroadbandWebInvoice({ data }: { data: IspInvoiceData }) {
             </p>
           </div>
 
-          <div className="text-right sm:self-end">
-            <div className="font-bold text-slate-900 text-xs mb-8">
+          <div className="flex flex-col items-end text-right sm:self-end">
+            <div className="font-bold text-slate-900 text-xs mb-1">
               {footer.authorizedSignatoryTitle || `For ${company.legalName}`}
             </div>
-            {/* <div className="border-t border-slate-400 pt-1 w-36 text-center text-[10px] text-slate-500 ml-auto">
-              Authorized Signatory
-            </div> */}
+
+            {/* Digital Seal Image (PAID) */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://png.pngtree.com/png-clipart/20230317/original/pngtree-paid-stamp-vector-illustration-png-image_8991938.png"
+              alt="PAID Digital Seal"
+              className="w-24 h-24 object-contain select-none"
+            />
           </div>
         </div>
 

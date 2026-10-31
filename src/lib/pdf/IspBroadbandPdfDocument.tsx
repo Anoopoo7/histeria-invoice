@@ -469,7 +469,13 @@ const styles = StyleSheet.create({
     fontSize: 7.5,
     fontFamily: "Helvetica-Bold",
     color: ACCENT_DARK,
-    marginBottom: 16,
+    marginBottom: 4,
+  },
+  digitalSealImage: {
+    width: 68,
+    height: 68,
+    objectFit: "contain",
+    marginRight: 4,
   },
   signatoryLine: {
     width: 100,
@@ -933,10 +939,10 @@ export function IspBroadbandPdfDocument({ data }: { data: IspInvoiceData }) {
             </View>
 
             <View style={styles.signatoryBlock}>
-              <Text style={styles.signatoryTitle}>
-                {footer.authorizedSignatoryTitle || `${company.legalName}`}
-              </Text>
-              {/* <Text style={styles.signatoryLine}>Authorized Signatory</Text> */}
+              <Image
+                src="https://png.pngtree.com/png-clipart/20230317/original/pngtree-paid-stamp-vector-illustration-png-image_8991938.png"
+                style={styles.digitalSealImage}
+              />
             </View>
           </View>
 
