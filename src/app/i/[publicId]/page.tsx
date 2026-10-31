@@ -2,8 +2,8 @@ import React from "react";
 import { notFound } from "next/navigation";
 import { getInvoiceByPublicIdAction } from "@/app/actions/invoice";
 import { WebInvoiceRenderer } from "@/components/template/WebInvoiceRenderer";
-import { Download } from "lucide-react";
 import { InvoiceDoc } from "@/types";
+import { PublicDownloadPdfButton } from "@/components/invoice/PublicDownloadPdfButton";
 
 export default async function PublicInvoicePage(props: {
   params: Promise<{ publicId: string }>;
@@ -36,13 +36,7 @@ export default async function PublicInvoicePage(props: {
             </div>
           </div>
 
-          <a
-            href={`/api/public/invoices/${invoice.publicId}/pdf`}
-            download
-            className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-4 py-2.5 rounded-lg shadow-sm transition-all active:scale-95"
-          >
-            <Download className="w-4 h-4" /> Download A4 PDF
-          </a>
+          <PublicDownloadPdfButton publicId={invoice.publicId} />
         </div>
 
         {/* Read-only Web Renderer */}

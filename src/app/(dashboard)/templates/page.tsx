@@ -5,6 +5,7 @@ import { getCurrentUserAndOrg } from "@/app/actions/auth";
 import { getTemplatesAction, setDefaultTemplateAction } from "@/app/actions/template";
 import { PlusCircle, Check, Edit, Star } from "lucide-react";
 import { InvoiceTemplateDoc } from "@/types";
+import { SetDefaultTemplateButton } from "@/components/template/SetDefaultTemplateButton";
 
 export default async function TemplatesListPage() {
   const { user, organization } = await getCurrentUserAndOrg();
@@ -88,12 +89,7 @@ export default async function TemplatesListPage() {
                     await setDefaultTemplateAction(tmpl._id);
                   }}
                 >
-                  <button
-                    type="submit"
-                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-1"
-                  >
-                    Set as Default
-                  </button>
+                  <SetDefaultTemplateButton />
                 </form>
               ) : (
                 <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1">

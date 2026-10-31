@@ -1,13 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { getOrganizationAction, updateOrganizationAction } from "@/app/actions/organization";
 import { Save, ArrowLeft, Check, AlertCircle, Loader2 } from "lucide-react";
 import { OrganizationDoc } from "@/types";
 
 export default function OrganizationSettingsPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -86,12 +85,12 @@ export default function OrganizationSettingsPage() {
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push("/organization")}
+          <Link
+            href="/organization"
             className="p-2 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
-          </button>
+          </Link>
           <div>
             <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
               Organization Settings

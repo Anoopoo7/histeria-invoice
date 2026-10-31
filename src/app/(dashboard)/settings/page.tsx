@@ -1,7 +1,8 @@
 import React from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUserAndOrg, logoutUser } from "@/app/actions/auth";
-import { User, Mail, LogOut, Building2 } from "lucide-react";
+import { User, Mail, Building2 } from "lucide-react";
+import { LogoutButton } from "@/components/common/LogoutButton";
 
 export default async function UserSettingsPage() {
   const { user, organization } = await getCurrentUserAndOrg();
@@ -60,12 +61,7 @@ export default async function UserSettingsPage() {
           redirect("/login");
         }}
       >
-        <button
-          type="submit"
-          className="w-full bg-red-50 hover:bg-red-100 text-red-700 font-semibold py-3 px-4 rounded-xl border border-red-200 text-xs transition-colors flex items-center justify-center gap-2"
-        >
-          <LogOut className="w-4 h-4" /> Log Out of Account
-        </button>
+        <LogoutButton />
       </form>
     </div>
   );

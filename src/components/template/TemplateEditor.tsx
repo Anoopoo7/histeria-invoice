@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TemplateJson, TemplateComponent } from "@/types";
 import { WebInvoiceRenderer } from "./WebInvoiceRenderer";
@@ -207,12 +208,12 @@ export function TemplateEditor({
       {/* Top Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push("/templates")}
+          <Link
+            href="/templates"
             className="p-2 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
-          </button>
+          </Link>
           <div>
             <input
               type="text"

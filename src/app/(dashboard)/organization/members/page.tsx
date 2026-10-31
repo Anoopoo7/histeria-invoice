@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   getOrganizationAction,
   addStaffMemberAction,
@@ -11,9 +11,9 @@ import { OrganizationDoc, OrganizationMember } from "@/types";
 import { UserPlus, Trash2, ArrowLeft, Loader2, AlertCircle } from "lucide-react";
 
 export default function StaffMembersPage() {
-  const router = useRouter();
   const [organization, setOrganization] = useState<OrganizationDoc | null>(null);
   const [loading, setLoading] = useState(true);
+  const [removingEmail, setRemovingEmail] = useState<string | null>(null);
 
   // Form state
   const [email, setEmail] = useState("");
@@ -56,11 +56,16 @@ export default function StaffMembersPage() {
 
   const handleRemoveMember = async (memberEmail: string) => {
     if (!confirm(`Are you sure you want to remove ${memberEmail} from this business?`)) return;
-    const res = await removeStaffMemberAction(memberEmail);
-    if (res.success) {
-      await loadOrg();
-    } else {
-      alert(res.error || "Failed to remove staff member.");
+    setRemovingEmail(memberEmail);
+    try {
+      const res = await removeStaffMemberAction(memberEmail);
+      if (res.success) {
+        await loadOrg();
+      } else {
+        alert(res.error || "Failed to remove staff member.");
+      }
+    } finally {
+      setRemovingEmail(null);
     }
   };
 
@@ -79,12 +84,12 @@ export default function StaffMembersPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <button
-          onClick={() => router.push("/organization")}
+        <Link
+          href="/organization"
           className="p-2 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
-        </button>
+        </Link>
         <div>
           <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
             Staff Members — {organization.name}
@@ -200,10 +205,15 @@ export default function StaffMembersPage() {
               {member.role !== "OWNER" && (
                 <button
                   onClick={() => handleRemoveMember(member.email)}
+                  disabled={removingEmail === member.email}
                   title="Remove Staff Member"
-                  className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                  className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  {removingEmail === member.email ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-red-600" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
                 </button>
               )}
             </div>

@@ -7,10 +7,10 @@ import {
   FileText,
   PlusCircle,
   Download,
-  Copy,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/cn";
 import { InvoiceDoc } from "@/types";
+import { DuplicateInvoiceButton } from "@/components/invoice/DuplicateInvoiceButton";
 
 export default async function InvoicesHistoryPage() {
   const { user, organization } = await getCurrentUserAndOrg();
@@ -126,12 +126,7 @@ export default async function InvoicesHistoryPage() {
                       await duplicateInvoiceAction(inv._id);
                     }}
                   >
-                    <button
-                      type="submit"
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg transition-colors"
-                    >
-                      <Copy className="w-3.5 h-3.5" /> Duplicate
-                    </button>
+                    <DuplicateInvoiceButton />
                   </form>
                 </div>
               </div>

@@ -1,9 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, Plus, LogOut, FileText, LayoutTemplate, Home } from "lucide-react";
+import { Building2, Plus, LogOut, FileText, LayoutTemplate, Home, Loader2 } from "lucide-react";
 import { logoutUser } from "@/app/actions/auth";
 import { OrgSwitcher } from "./OrgSwitcher";
 import { OrganizationDoc } from "@/types";
@@ -16,6 +16,7 @@ interface HeaderProps {
 export function Header({ user, organization }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [loggingOut, setLoggingOut] = useState(false);
 
   if (
     pathname.startsWith("/login") ||
@@ -26,8 +27,13 @@ export function Header({ user, organization }: HeaderProps) {
   }
 
   const handleLogout = async () => {
-    await logoutUser();
-    router.push("/login");
+    setLoggingOut(true);
+    try {
+      await logoutUser();
+      router.push("/login");
+    } catch {
+      setLoggingOut(false);
+    }
   };
 
   return (
@@ -104,10 +110,15 @@ export function Header({ user, organization }: HeaderProps) {
           {user && (
             <button
               onClick={handleLogout}
+              disabled={loggingOut}
               title="Logout"
-              className="p-2 text-slate-500 hover:text-red-600 rounded-lg hover:bg-slate-100 transition-colors"
+              className="p-2 text-slate-500 hover:text-red-600 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-50"
             >
-              <LogOut className="w-4 h-4" />
+              {loggingOut ? (
+                <Loader2 className="w-4 h-4 animate-spin text-red-600" />
+              ) : (
+                <LogOut className="w-4 h-4" />
+              )}
             </button>
           )}
         </div>

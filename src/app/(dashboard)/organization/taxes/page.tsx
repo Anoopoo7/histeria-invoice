@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   getTaxProfilesAction,
   createTaxProfileAction,
@@ -11,9 +11,9 @@ import { TaxProfileDoc } from "@/types";
 import { Plus, Trash2, ArrowLeft, Loader2 } from "lucide-react";
 
 export default function TaxProfilesPage() {
-  const router = useRouter();
   const [taxProfiles, setTaxProfiles] = useState<TaxProfileDoc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Modal / Add form state
   const [name, setName] = useState("");
@@ -62,8 +62,13 @@ export default function TaxProfilesPage() {
   };
 
   const handleDeleteTax = async (id: string) => {
-    await deleteTaxProfileAction(id);
-    await loadTaxes();
+    setDeletingId(id);
+    try {
+      await deleteTaxProfileAction(id);
+      await loadTaxes();
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   if (loading) {
@@ -77,12 +82,12 @@ export default function TaxProfilesPage() {
   return (
     <div className="max-w-xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <button
-          onClick={() => router.push("/organization")}
+        <Link
+          href="/organization"
           className="p-2 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
-        </button>
+        </Link>
         <div>
           <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
             GST Tax Profiles
@@ -165,9 +170,14 @@ export default function TaxProfilesPage() {
 
             <button
               onClick={() => handleDeleteTax(tp._id)}
-              className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+              disabled={deletingId === tp._id}
+              className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
             >
-              <Trash2 className="w-4 h-4" />
+              {deletingId === tp._id ? (
+                <Loader2 className="w-4 h-4 animate-spin text-red-600" />
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
             </button>
           </div>
         ))}

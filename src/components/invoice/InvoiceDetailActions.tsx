@@ -19,10 +19,17 @@ export function InvoiceDetailActions({
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   const publicUrl = typeof window !== "undefined"
     ? `${window.location.origin}/i/${publicId}`
     : `/i/${publicId}`;
+
+  const handleDownload = () => {
+    setDownloading(true);
+    setTimeout(() => setDownloading(false), 2500);
+  };
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(publicUrl);
@@ -31,18 +38,23 @@ export function InvoiceDetailActions({
   };
 
   const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `Invoice ${invoiceNumber}`,
-          text: `View Tax Invoice ${invoiceNumber}`,
-          url: publicUrl,
-        });
-      } catch {
+    setSharing(true);
+    try {
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: `Invoice ${invoiceNumber}`,
+            text: `View Tax Invoice ${invoiceNumber}`,
+            url: publicUrl,
+          });
+        } catch {
+          handleCopyLink();
+        }
+      } else {
         handleCopyLink();
       }
-    } else {
-      handleCopyLink();
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -64,16 +76,31 @@ export function InvoiceDetailActions({
         <a
           href={`/api/invoices/${invoiceId}/pdf`}
           download
+          onClick={handleDownload}
           className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-4 py-2.5 rounded-lg shadow-sm transition-all active:scale-95"
         >
-          <Download className="w-4 h-4" /> Download A4 PDF
+          {downloading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" /> Preparing PDF...
+            </>
+          ) : (
+            <>
+              <Download className="w-4 h-4" /> Download A4 PDF
+            </>
+          )}
         </a>
 
         <button
           onClick={handleShare}
-          className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold text-xs px-3.5 py-2.5 rounded-lg transition-colors"
+          disabled={sharing}
+          className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold text-xs px-3.5 py-2.5 rounded-lg transition-colors disabled:opacity-50"
         >
-          <Share2 className="w-4 h-4 text-slate-700" /> Share
+          {sharing ? (
+            <Loader2 className="w-4 h-4 animate-spin text-slate-700" />
+          ) : (
+            <Share2 className="w-4 h-4 text-slate-700" />
+          )}
+          <span>Share</span>
         </button>
 
         <button
